@@ -1,10 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Burn, Mint, MintTo, Token, Transfer};
 
+pub mod utils;
+
 declare_id!("D62yCVSQs6cerJJrfhnpSRVRUVk6HQU72YLmfXjWTzGC");
 
 pub const CORE_STATE_SEED: &str = "core-state";
-pub const HOUSE_SEED: &str = "house";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
 
 #[program]
@@ -18,10 +19,38 @@ pub mod coin_flip {
     }
 
     pub fn deposit_sol(ctx: Context<DepositSol>, args: DepositSolArgs) -> ProgramResult {
+        let ix = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.admin.key(),
+            &ctx.accounts.vault_authority.key(),
+            args.amount,
+        );
+        let _result = anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.admin.to_account_info(),
+                ctx.accounts.vault_authority.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        );
+
         Ok(())
     }
 
     pub fn withdraw_sol(ctx: Context<WithdrawSol>, args: WithdrawSolArgs) -> ProgramResult {
+        let ix = anchor_lang::solana_program::system_instruction::transfer(
+            &ctx.accounts.vault_authority.key(),
+            &ctx.accounts.admin.key(),
+            args.amount,
+        );
+        let _result = anchor_lang::solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.vault_authority.to_account_info(),
+                ctx.accounts.admin.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+        );
+
         Ok(())
     }
 
@@ -63,7 +92,7 @@ pub struct Initialize<'info> {
     )]
     pub core_state: Account<'info, CoreState>,
     #[account(
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -80,10 +109,11 @@ pub struct DepositSol<'info> {
     pub admin: Signer<'info>,
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -93,10 +123,11 @@ pub struct WithdrawSol<'info> {
     pub admin: Signer<'info>,
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -106,7 +137,7 @@ pub struct RegisterSpl<'info> {
     pub admin: Signer<'info>,
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -119,7 +150,7 @@ pub struct DepositSpl<'info> {
     pub admin: Signer<'info>,
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -132,7 +163,7 @@ pub struct WithdrawSpl<'info> {
     pub admin: Signer<'info>,
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
