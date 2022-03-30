@@ -27,10 +27,10 @@ export async function initialize(admin: Keypair) {
   return { coreState, vaultAuthority };
 }
 
-export async function depositSol(admin: Keypair, amount: number) {
+export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
-  await program.rpc.depositSol({
+  await program.rpc.deposit({
     coreStateNonce,
     vaultAuthNonce,
     amount: new anchor.BN(amount)
@@ -45,21 +45,38 @@ export async function depositSol(admin: Keypair, amount: number) {
   return coreState;
 }
 
-
-export async function withdrawSol(admin: Keypair, amount: number) {
+export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
-  await program.rpc.withdrawSol({
-    coreStateNonce,
-    vaultAuthNonce,
-    amount: new anchor.BN(amount)
-  }, {
-    accounts: {
-      admin: admin.publicKey,
-      vaultAuthority,
-      systemProgram: SystemProgram.programId
-    },
-    signers: [admin]
-  });
+  // await program.rpc.withdraw({
+  //   coreStateNonce,
+  //   vaultAuthNonce,
+  //   amount: new anchor.BN(amount)
+  // }, {
+  //   accounts: {
+  //     admin: admin.publicKey,
+  //     vaultAuthority,
+  //     systemProgram: SystemProgram.programId
+  //   },
+  //   signers: [admin]
+  // });
+  return coreState;
+}
+
+export async function bet(admin: Keypair, amount: number) {
+  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
+  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  // await program.rpc.withdraw({
+  //   coreStateNonce,
+  //   vaultAuthNonce,
+  //   amount: new anchor.BN(amount)
+  // }, {
+  //   accounts: {
+  //     admin: admin.publicKey,
+  //     vaultAuthority,
+  //     systemProgram: SystemProgram.programId
+  //   },
+  //   signers: [admin]
+  // });
   return coreState;
 }

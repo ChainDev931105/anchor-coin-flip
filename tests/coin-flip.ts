@@ -4,8 +4,8 @@ import { CoinFlip } from '../target/types/coin_flip';
 import { Keypair, SystemProgram } from '@solana/web3.js';
 import {
   initialize,
-  depositSol,
-  withdrawSol
+  deposit,
+  withdraw
 } from './coin-flip_instruction';
 
 describe('coin-flip', () => {
@@ -34,11 +34,11 @@ describe('coin-flip', () => {
     console.log("Vault Authority: ", vaultAuthority.toBase58());
   });
 
-  it('Deposit Sol', async () => {
+  it('Deposit', async () => {
     const amount = 100_000_000;
     const balanceBefore = await provider.connection.getBalance(vaultAuth);
     
-    await depositSol(admin, amount);
+    await deposit(admin, amount);
 
     const balanceAfter = await provider.connection.getBalance(vaultAuth);
 
@@ -49,7 +49,7 @@ describe('coin-flip', () => {
     const amount = 50_000_000;
     const balanceBefore = await provider.connection.getBalance(vaultAuth);
     
-    await withdrawSol(admin, amount);
+    await withdraw(admin, amount);
 
     const balanceAfter = await provider.connection.getBalance(vaultAuth);
 
