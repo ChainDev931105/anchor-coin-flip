@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, TokenAccount, Burn, Mint, MintTo, Token, Transfer};
 
-pub mod utils;
-
-declare_id!("D62yCVSQs6cerJJrfhnpSRVRUVk6HQU72YLmfXjWTzGC");
+declare_id!("5G2vmwuHzznDrRQYHsK4FfXJscPMHUSqZvouCHa9SnQ7");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
@@ -11,14 +9,15 @@ pub const VAULT_AUTH_SEED: &str = "vault-auth";
 #[program]
 pub mod coin_flip {
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> ProgramResult {
+
+    pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
         ctx.accounts.core_state.admin = ctx.accounts.admin.key();
         ctx.accounts.core_state.core_state_nonce = args.core_state_nonce;
         ctx.accounts.core_state.flip_counter = 0;
         Ok(())
     }
 
-    pub fn deposit_sol(ctx: Context<DepositSol>, args: DepositSolArgs) -> ProgramResult {
+    pub fn deposit_sol(ctx: Context<DepositSol>, args: DepositSolArgs) -> Result<()> {
         let ix = anchor_lang::solana_program::system_instruction::transfer(
             &ctx.accounts.admin.key(),
             &ctx.accounts.vault_authority.key(),
@@ -36,7 +35,7 @@ pub mod coin_flip {
         Ok(())
     }
 
-    pub fn withdraw_sol(ctx: Context<WithdrawSol>, args: WithdrawSolArgs) -> ProgramResult {
+    pub fn withdraw_sol(ctx: Context<WithdrawSol>, args: WithdrawSolArgs) -> Result<()> {
         let ix = anchor_lang::solana_program::system_instruction::transfer(
             &ctx.accounts.vault_authority.key(),
             &ctx.accounts.admin.key(),
@@ -54,23 +53,23 @@ pub mod coin_flip {
         Ok(())
     }
 
-    pub fn register_spl(ctx: Context<RegisterSpl>, args: RegisterSplArgs) -> ProgramResult {
+    pub fn register_spl(ctx: Context<RegisterSpl>, args: RegisterSplArgs) -> Result<()> {
         Ok(())
     }
 
-    pub fn deposit_spl(ctx: Context<DepositSpl>, args: DepositSplArgs) -> ProgramResult {
+    pub fn deposit_spl(ctx: Context<DepositSpl>, args: DepositSplArgs) -> Result<()> {
         Ok(())
     }
 
-    pub fn withdraw_spl(ctx: Context<WithdrawSpl>, args: WithdrawSplArgs) -> ProgramResult {
+    pub fn withdraw_spl(ctx: Context<WithdrawSpl>, args: WithdrawSplArgs) -> Result<()> {
         Ok(())
     }
 
-    pub fn bet_sol(ctx: Context<BetSol>, args: BetSolArgs) -> ProgramResult {
+    pub fn bet_sol(ctx: Context<BetSol>, args: BetSolArgs) -> Result<()> {
         Ok(())
     }
 
-    pub fn bet_spl(ctx: Context<BetSpl>, args: BetSplArgs) -> ProgramResult {
+    pub fn bet_spl(ctx: Context<BetSpl>, args: BetSplArgs) -> Result<()> {
         Ok(())
     }
 }
@@ -86,16 +85,18 @@ pub struct Initialize<'info> {
     pub admin: Signer<'info>,
     #[account(
         init,
+        space = 1 + 8 + 1 + std::mem::size_of::<Pubkey>(),
         seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
-        bump = args.core_state_nonce,
+        bump,
         payer = admin,
     )]
     pub core_state: Account<'info, CoreState>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
-    pub vault_authority: AccountInfo<'info>,
+    pub vault_authority: AccountInfo<'info>, 
     pub system_program: Program<'info, System>,
 }
 
@@ -107,6 +108,7 @@ pub struct DepositSol<'info> {
         constraint = admin.lamports() >= args.amount @ ErrorCode::InsufficientFunds,
     )]
     pub admin: Signer<'info>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -121,6 +123,7 @@ pub struct DepositSol<'info> {
 pub struct WithdrawSol<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -135,6 +138,7 @@ pub struct WithdrawSol<'info> {
 pub struct RegisterSpl<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -148,6 +152,7 @@ pub struct RegisterSpl<'info> {
 pub struct DepositSpl<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -161,6 +166,7 @@ pub struct DepositSpl<'info> {
 pub struct WithdrawSpl<'info> {
     #[account(mut)]
     pub admin: Signer<'info>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -172,6 +178,7 @@ pub struct WithdrawSpl<'info> {
 #[derive(Accounts)]
 #[instruction(args: BetSolArgs)]
 pub struct BetSol<'info> {
+    /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(mut)]
     pub admin: AccountInfo<'info>,
     #[account(
@@ -188,6 +195,7 @@ pub struct BetSol<'info> {
 pub struct BetSpl<'info> {
     #[account(mut)]
     pub user_authority: Signer<'info>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
     pub admin: AccountInfo<'info>,
     #[account(
         seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -277,7 +285,7 @@ pub struct CoreState {
     pub flip_counter: u8,
 }
 
-#[error]
+#[error_code]
 pub enum ErrorCode {
     #[msg("Wrong Admin Address")]
     WrongAdmin,
