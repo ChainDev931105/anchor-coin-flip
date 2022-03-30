@@ -8,6 +8,7 @@ declare_id!("5G2vmwuHzznDrRQYHsK4FfXJscPMHUSqZvouCHa9SnQ7");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
+pub const VAULT_TOKEN_ACCOUNT_SEED: &str = "vault-token-account";
 
 pub mod utils;
 
@@ -18,6 +19,7 @@ pub mod coin_flip {
     pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
         ctx.accounts.core_state.admin = ctx.accounts.admin.key();
         ctx.accounts.core_state.core_state_nonce = args.core_state_nonce;
+        ctx.accounts.core_state.vault_auth_nonce = args.vault_auth_nonce;
         ctx.accounts.core_state.flip_counter = 0;
         Ok(())
     }
@@ -27,7 +29,7 @@ pub mod coin_flip {
 
         let vault_auth_seeds: &[&[u8]] = &[
             VAULT_AUTH_SEED.as_bytes().as_ref(),
-            &[args.vault_auth_nonce],
+            &[ctx.accounts.core_state.vault_auth_nonce],
         ];
 
         utils::create_program_token_account_if_not_present(
@@ -98,7 +100,7 @@ pub struct Initialize<'info> {
     pub admin: Signer<'info>,
     #[account(
         init,
-        space = 1 + 8 + 1 + std::mem::size_of::<Pubkey>(),
+        space = 8 + 1 + 1 + 8 + std::mem::size_of::<Pubkey>(),
         seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump,
         payer = admin,
@@ -106,7 +108,7 @@ pub struct Initialize<'info> {
     pub core_state: Account<'info, CoreState>,
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -118,7 +120,7 @@ pub struct Initialize<'info> {
 pub struct Deposit<'info> {
     #[account(
         seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
-        bump = args.core_state_nonce,
+        bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
     #[account(
@@ -129,8 +131,8 @@ pub struct Deposit<'info> {
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
-        bump = args.vault_auth_nonce,
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        bump = core_state.vault_auth_nonce,
     )]
     pub vault_authority: UncheckedAccount<'info>,
     pub token_mint: Account<'info, Mint>,
@@ -144,6 +146,8 @@ pub struct Deposit<'info> {
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
+        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes().as_ref(), token_mint.key().as_ref()],
+        bump = args.vault_token_account_seed,
         // constraint = vault_token_account.owner == vault_authority.key() @ ErrorCode::TokenOnwerMismatch,
         // constraint = vault_token_account.mint == token_mint.key() @ ErrorCode::TokenMintMismatch,
         // constraint = vault_token_account.amount >= args.amount @ ErrorCode::InsufficientFunds,
@@ -160,7 +164,7 @@ pub struct Deposit<'info> {
 pub struct Withdraw<'info> {
     #[account(
         seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
-        bump = args.core_state_nonce,
+        bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
     #[account(
@@ -171,8 +175,8 @@ pub struct Withdraw<'info> {
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
-        bump = args.vault_auth_nonce,
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        bump = core_state.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
     pub token_mint: Account<'info, Mint>,
@@ -205,7 +209,7 @@ pub struct Bet<'info> {
     /// CHECK: This is not dangerous because we don't read or write from this account
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -238,15 +242,13 @@ pub struct InitializeArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct DepositArgs {
-    pub core_state_nonce: u8,
-    pub vault_auth_nonce: u8,
+    pub vault_token_account_seed: u8,
     pub amount: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct WithdrawArgs {
-    pub core_state_nonce: u8,
-    pub vault_auth_nonce: u8,
+    pub vault_token_account_seed: u8,
     pub amount: u64,
 }
 
@@ -267,8 +269,9 @@ pub struct BetArgs {
 #[derive(Default)]
 pub struct CoreState {
     pub core_state_nonce: u8,
+    pub vault_auth_nonce: u8,
     pub admin: Pubkey, // admin public key
-    pub flip_counter: u8,
+    pub flip_counter: u64,
 }
 
 #[error_code]

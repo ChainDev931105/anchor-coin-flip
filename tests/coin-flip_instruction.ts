@@ -1,10 +1,12 @@
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
-import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, createAssociatedTokenAccount } from '@solana/spl-token';
 import { CoinFlip } from '../target/types/coin_flip';
 import {
   getCoreState,
-  getVaultAuth
+  getVaultAuth,
+  getVaultTokenAccount
 } from './coin-flip_pda';
 
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
@@ -30,15 +32,23 @@ export async function initialize(admin: Keypair) {
 export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  let [vaultTokenAccount, vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, admin.publicKey);
+  let adminTokenAccount = getAssociatedTokenAddress(tokenMint, admin.publicKey);
   await program.rpc.deposit({
     coreStateNonce,
     vaultAuthNonce,
     amount: new anchor.BN(amount)
   }, {
     accounts: {
+      coreState,
       admin: admin.publicKey,
       vaultAuthority,
-      systemProgram: SystemProgram.programId
+      tokenMint,
+      adminTokenAccount,
+      vaultTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY
     },
     signers: [admin]
   });

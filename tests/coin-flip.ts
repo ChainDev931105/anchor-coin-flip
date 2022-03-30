@@ -29,9 +29,9 @@ describe('coin-flip', () => {
 
     // initialize
     const { coreState, vaultAuthority } = await initialize(admin);
-    vaultAuth = vaultAuthority;
-    console.log("Core State: ", await program.account.coreState.fetch(coreState));
-    console.log("Vault Authority: ", vaultAuthority.toBase58());
+    // vaultAuth = vaultAuthority;
+    // console.log("Core State: ", await program.account.coreState.fetch(coreState));
+    // console.log("Vault Authority: ", vaultAuthority.toBase58());
   });
 
   it('Deposit', async () => {

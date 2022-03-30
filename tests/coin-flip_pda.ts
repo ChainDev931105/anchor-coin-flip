@@ -3,6 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 
 const CORE_STATE_SEED: string = "core-state";
 const VAULT_AUTH_SEED: string = "vault-auth";
+const VAULT_TOKEN_ACCOUNT_SEED: string = "vault-token-account";
 
 export async function getCoreState(programId: PublicKey, admin: PublicKey) {
   return await anchor.web3.PublicKey.findProgramAddress(
@@ -18,6 +19,16 @@ export async function getVaultAuth(programId: PublicKey, admin: PublicKey) {
   return await anchor.web3.PublicKey.findProgramAddress(
     [
       Buffer.from(anchor.utils.bytes.utf8.encode(VAULT_AUTH_SEED)),
+      admin.toBuffer()
+    ],
+    programId
+  );
+}
+
+export async function getVaultTokenAccount(programId: PublicKey, admin: PublicKey) {
+  return await anchor.web3.PublicKey.findProgramAddress(
+    [
+      Buffer.from(anchor.utils.bytes.utf8.encode(VAULT_TOKEN_ACCOUNT_SEED)),
       admin.toBuffer()
     ],
     programId
