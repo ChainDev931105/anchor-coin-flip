@@ -135,6 +135,41 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(args: RegisterArgs)]
+pub struct Register<'info> {
+    #[account(
+        seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        bump = core_state.core_state_nonce,
+    )]
+    pub core_state: Account<'info, CoreState>,
+    #[account(
+        mut,
+        constraint = admin.key() == core_state.admin @ ErrorCode::WrongAdmin,
+    )]
+    pub admin: Signer<'info>,
+    pub token_mint: Account<'info, Mint>,
+    /// CHECK:
+    #[account(
+        mut,
+        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        bump = core_state.vault_auth_nonce,
+    )]
+    pub vault_authority: AccountInfo<'info>,
+    #[account(
+        init,
+        token::mint = token_mint,
+        token::authority = vault_authority,
+        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes().as_ref(), token_mint.key().as_ref(), admin.key().as_ref()],
+        bump,
+        payer = admin,
+    )]
+    pub vault_token_account: Account<'info, TokenAccount>,
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
 #[instruction(args: DepositArgs)]
 pub struct Deposit<'info> {
     #[account(
@@ -159,11 +194,7 @@ pub struct Deposit<'info> {
     #[account(mut)]
     pub admin_token_account: UncheckedAccount<'info>,
     /// CHECK:
-    #[account(
-        mut,
-        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes().as_ref(), token_mint.key().as_ref(), admin.key().as_ref()],
-        bump = args.vault_token_account_nonce,        
-    )]
+    #[account(mut)]
     pub vault_token_account: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -253,8 +284,12 @@ pub struct InitializeArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct DepositArgs {
+pub struct RegisterArgs {
     pub vault_token_account_nonce: u8,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct DepositArgs {
     pub amount: u64,
 }
 

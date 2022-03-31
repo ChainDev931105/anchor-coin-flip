@@ -6,6 +6,7 @@ import { createAssociatedTokenAccount, createMint, getAssociatedTokenAddress, ge
 import { expect } from "chai";
 import {
   initialize,
+  register,
   deposit,
   withdraw
 } from './coin-flip_instruction';
@@ -46,17 +47,17 @@ describe('coin-flip', () => {
     console.log("Vault Authority: ", vaultAuthority.toBase58());
   });
 
-  // it('Deposit Sol', async () => {
-  //   const balanceBefore = await provider.connection.getBalance(vaultAuth);
+  it('Deposit Sol', async () => {
+    const balanceBefore = await provider.connection.getBalance(vaultAuth);
     
-  //   await deposit(admin, NATIVE_MINT, DEPOSIT_AMOUNT);
+    await deposit(admin, NATIVE_MINT, DEPOSIT_AMOUNT);
 
-  //   const balanceAfter = await provider.connection.getBalance(vaultAuth);
+    const balanceAfter = await provider.connection.getBalance(vaultAuth);
 
-  //   expect(balanceAfter - balanceBefore).to.equal(DEPOSIT_AMOUNT);
-  // });
+    expect(balanceAfter - balanceBefore).to.equal(DEPOSIT_AMOUNT);
+  });
 
-  it('Deposit Spl', async () => {
+  it('Register Spl', async () => {
     // mint a new token
     tokenMint = await createMint(
       provider.connection,
@@ -66,6 +67,10 @@ describe('coin-flip', () => {
       9
     );
 
+    await register(admin, tokenMint);
+  });
+
+  it('Deposit Spl', async () => {
     // create admin token account
     adminTokenAccount = await createAssociatedTokenAccount(
       provider.connection,
@@ -85,21 +90,15 @@ describe('coin-flip', () => {
     );
 
     let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(
-      program.programId, tokenMint, admin.publicKey);
+      program.programId, tokenMint, admin.publicKey
+    );
 
     vaultTokenAccount = _vaultTokenAccount;
-    console.log(vaultTokenAccount.toBase58());
-    
-    // const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
-    const balanceBefore = 0;
+    const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
     
     await deposit(admin, tokenMint, DEPOSIT_AMOUNT);
 
-    // vaultTokenAccount = await getAssociatedTokenAddress(tokenMint, vaultAuth);
-    console.log(vaultTokenAccount.toBase58());
-
     const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
-
     expect(balanceAfter - balanceBefore).to.equal(DEPOSIT_AMOUNT);
   });
 });
