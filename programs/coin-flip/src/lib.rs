@@ -24,55 +24,71 @@ pub mod coin_flip {
         Ok(())
     }
 
+    pub fn register(ctx: Context<Register>, args: RegisterArgs) -> Result<()> {
+        Ok(())
+    }
+
     pub fn deposit(ctx: Context<Deposit>, args: DepositArgs) -> Result<()> {
-        let is_native = ctx.accounts.token_mint.key() == spl_token::native_mint::id();
+        let core_state = &ctx.accounts.core_state;
+        let admin = &ctx.accounts.admin;
+        let vault_authority = &ctx.accounts.vault_authority;
+        let token_mint = &ctx.accounts.token_mint;
+        let admin_token_account = &ctx.accounts.admin_token_account;
+        let vault_token_account = &ctx.accounts.vault_token_account;
+        let token_program = &ctx.accounts.token_program;
+        let system_program = &ctx.accounts.system_program;
+        let rent = &ctx.accounts.rent;
+
+        let is_native = token_mint.key() == spl_token::native_mint::id();
 
         let vault_auth_seeds: &[&[u8]] = &[
             VAULT_AUTH_SEED.as_bytes().as_ref(),
-            &[ctx.accounts.core_state.vault_auth_nonce],
+            &[core_state.vault_auth_nonce],
         ];
 
         utils::create_program_token_account_if_not_present(
-            &ctx.accounts.vault_token_account,
-            &ctx.accounts.system_program,
-            &ctx.accounts.admin,
-            &ctx.accounts.token_program,
-            &ctx.accounts.token_mint,
-            &ctx.accounts.vault_authority,
-            &ctx.accounts.rent,
+            vault_token_account,
+            system_program,
+            &admin,
+            token_program,
+            token_mint,
+            &vault_authority,
+            rent,
             vault_auth_seeds,// admin seeds
             &[&[]],// admin seeds
             is_native,
         )?;
 
         if !is_native {
+            utils::assert_is_ata(&admin_token_account, &admin.key(), &token_mint.key())?;
             anchor_lang::solana_program::program::invoke(
                 &spl_token::instruction::transfer(
-                    &ctx.accounts.token_program.key(),
-                    &ctx.accounts.admin_token_account.key(),
-                    &ctx.accounts.vault_token_account.key(),
-                    &ctx.accounts.admin.key(),
+                    &token_program.key(),
+                    &admin_token_account.key(),
+                    &vault_token_account.key(),
+                    &admin.key(),
                     &[],
                     args.amount,
                 )?,
                 &[
-                    ctx.accounts.vault_token_account.to_account_info(),
-                    ctx.accounts.admin_token_account.to_account_info(),
-                    ctx.accounts.token_program.to_account_info(),
-                    ctx.accounts.admin.to_account_info(),
+                    vault_token_account.to_account_info(),
+                    admin_token_account.to_account_info(),
+                    token_program.to_account_info(),
+                    admin.to_account_info(),
                 ],
             )?;
         } else {
+            utils::assert_keys_equal(admin_token_account.key(), admin.key())?;
             anchor_lang::solana_program::program::invoke(
                 &anchor_lang::solana_program::system_instruction::transfer(
-                    &ctx.accounts.admin_token_account.key(),
-                    &ctx.accounts.vault_token_account.key(),
+                    &admin_token_account.key(),
+                    &vault_token_account.key(),
                     args.amount,
                 ),
                 &[
-                    ctx.accounts.vault_token_account.to_account_info(),
-                    ctx.accounts.admin_token_account.to_account_info(),
-                    ctx.accounts.system_program.to_account_info(),
+                    vault_token_account.to_account_info(),
+                    admin_token_account.to_account_info(),
+                    system_program.to_account_info(),
                 ],
             )?;
         }
@@ -106,10 +122,13 @@ pub struct Initialize<'info> {
         payer = admin,
     )]
     pub core_state: Account<'info, CoreState>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
+    /// CHECK: 
     #[account(
+        init,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
-        bump = args.vault_auth_nonce,
+        bump,
+        space = 8,
+        payer = admin,
     )]
     pub vault_authority: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
@@ -128,29 +147,22 @@ pub struct Deposit<'info> {
         constraint = admin.key() == core_state.admin @ ErrorCode::WrongAdmin,
     )]
     pub admin: Signer<'info>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
+    /// CHECK:
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
         bump = core_state.vault_auth_nonce,
     )]
-    pub vault_authority: UncheckedAccount<'info>,
+    pub vault_authority: AccountInfo<'info>,
     pub token_mint: Account<'info, Mint>,
+    /// CHECK:
+    #[account(mut)]
+    pub admin_token_account: UncheckedAccount<'info>,
+    /// CHECK:
     #[account(
         mut,
-        constraint = admin_token_account.owner == admin.key() @ ErrorCode::TokenOnwerMismatch,
-        constraint = admin_token_account.mint == token_mint.key() @ ErrorCode::TokenMintMismatch,
-        constraint = admin_token_account.amount >= args.amount @ ErrorCode::InsufficientFunds,
-    )]
-    pub admin_token_account: Account<'info, TokenAccount>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
-    #[account(
-        mut,
-        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes().as_ref(), token_mint.key().as_ref()],
-        bump = args.vault_token_account_seed,
-        // constraint = vault_token_account.owner == vault_authority.key() @ ErrorCode::TokenOnwerMismatch,
-        // constraint = vault_token_account.mint == token_mint.key() @ ErrorCode::TokenMintMismatch,
-        // constraint = vault_token_account.amount >= args.amount @ ErrorCode::InsufficientFunds,
+        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes().as_ref(), token_mint.key().as_ref(), admin.key().as_ref()],
+        bump = args.vault_token_account_nonce,        
     )]
     pub vault_token_account: UncheckedAccount<'info>,
 
@@ -172,7 +184,7 @@ pub struct Withdraw<'info> {
         constraint = admin.key() == core_state.admin @ ErrorCode::WrongAdmin,
     )]
     pub admin: Signer<'info>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
+    /// CHECK:
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -200,13 +212,13 @@ pub struct Bet<'info> {
         bump = args.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
+    /// CHECK:
     #[account(
         mut,
         constraint = admin.key() == core_state.admin @ ErrorCode::WrongAdmin,
     )]
     pub admin: AccountInfo<'info>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
+    /// CHECK:
     #[account(
         mut,
         seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
@@ -242,13 +254,12 @@ pub struct InitializeArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct DepositArgs {
-    pub vault_token_account_seed: u8,
+    pub vault_token_account_nonce: u8,
     pub amount: u64,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct WithdrawArgs {
-    pub vault_token_account_seed: u8,
     pub amount: u64,
 }
 
@@ -284,4 +295,10 @@ pub enum ErrorCode {
     TokenMintMismatch,
     #[msg("Insufficient Funds")]
     InsufficientFunds,
+    #[msg("Incorrect Owner")]
+    IncorrectOwner,
+    #[msg("Uninitialized Account")]
+    UninitializedAccount,
+    #[msg("PublicKey Mismatch")]
+    PublicKeyMismatch,
 }

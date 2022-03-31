@@ -7,8 +7,49 @@ use anchor_lang::{
         system_instruction,
     },
 };
+use spl_associated_token_account::get_associated_token_address;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use spl_token::{instruction::initialize_account2, state::Account as SplAccount};
+use crate::{ErrorCode};
+
+pub fn assert_is_ata(
+    ata: &AccountInfo,
+    wallet: &Pubkey,
+    mint: &Pubkey,
+) -> Result<SplAccount> {
+    assert_owned_by(ata, &spl_token::id())?;
+    let ata_account: SplAccount = assert_initialized(ata)?;
+    assert_keys_equal(ata_account.owner, *wallet)?;
+    assert_keys_equal(get_associated_token_address(wallet, mint), *ata.key)?;
+    Ok(ata_account)
+}
+
+pub fn assert_keys_equal(key1: Pubkey, key2: Pubkey) -> Result<()> {
+    if key1 != key2 {
+        Err(ErrorCode::PublicKeyMismatch.into())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn assert_owned_by(account: &AccountInfo, owner: &Pubkey) -> Result<()> {
+    if account.owner != owner {
+        Err(ErrorCode::IncorrectOwner.into())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn assert_initialized<T: Pack + IsInitialized>(
+    account_info: &AccountInfo,
+) -> Result<T> {
+    let account: T = T::unpack_unchecked(&account_info.data.borrow())?;
+    if !account.is_initialized() {
+        Err(ErrorCode::UninitializedAccount.into())
+    } else {
+        Ok(account)
+    }
+}
 
 pub fn create_program_token_account_if_not_present<'a>(
     payment_account: &UncheckedAccount<'a>,

@@ -25,10 +25,11 @@ export async function getVaultAuth(programId: PublicKey, admin: PublicKey) {
   );
 }
 
-export async function getVaultTokenAccount(programId: PublicKey, admin: PublicKey) {
+export async function getVaultTokenAccount(programId: PublicKey, tokenMint: PublicKey, admin: PublicKey) {
   return await anchor.web3.PublicKey.findProgramAddress(
     [
       Buffer.from(anchor.utils.bytes.utf8.encode(VAULT_TOKEN_ACCOUNT_SEED)),
+      tokenMint.toBuffer(),
       admin.toBuffer()
     ],
     programId

@@ -1,7 +1,7 @@
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { Keypair, PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
-import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, createAssociatedTokenAccount } from '@solana/spl-token';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, NATIVE_MINT } from '@solana/spl-token';
 import { CoinFlip } from '../target/types/coin_flip';
 import {
   getCoreState,
@@ -32,11 +32,15 @@ export async function initialize(admin: Keypair) {
 export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
-  let [vaultTokenAccount, vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, admin.publicKey);
-  let adminTokenAccount = getAssociatedTokenAddress(tokenMint, admin.publicKey);
+  let [_vaultTokenAccount, vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+
+  let adminTokenAccount = (tokenMint == NATIVE_MINT) ? 
+    admin.publicKey : (await getAssociatedTokenAddress(tokenMint, admin.publicKey));
+  let vaultTokenAccount = (tokenMint == NATIVE_MINT) ? 
+    vaultAuthority : _vaultTokenAccount;
+    
   await program.rpc.deposit({
-    coreStateNonce,
-    vaultAuthNonce,
+    vaultTokenAccountNonce,
     amount: new anchor.BN(amount)
   }, {
     accounts: {
