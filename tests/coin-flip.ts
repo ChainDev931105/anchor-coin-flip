@@ -53,7 +53,6 @@ describe('coin-flip', () => {
     await deposit(admin, NATIVE_MINT, DEPOSIT_AMOUNT);
 
     const balanceAfter = await provider.connection.getBalance(vaultAuth);
-
     expect(balanceAfter - balanceBefore).to.equal(DEPOSIT_AMOUNT);
   });
 
@@ -100,5 +99,23 @@ describe('coin-flip', () => {
 
     const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
     expect(balanceAfter - balanceBefore).to.equal(DEPOSIT_AMOUNT);
+  });
+
+  it('Withdraw Sol', async () => {
+    const balanceBefore = await provider.connection.getBalance(vaultAuth);
+    
+    await withdraw(admin, NATIVE_MINT, WITHDRAW_AMOUNT);
+
+    const balanceAfter = await provider.connection.getBalance(vaultAuth);
+    expect(balanceBefore - balanceAfter).to.equal(WITHDRAW_AMOUNT);
+  });
+
+  it('Withdraw Spl', async () => {
+    const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
+    
+    await withdraw(admin, tokenMint, WITHDRAW_AMOUNT);
+
+    const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
+    expect(balanceBefore - balanceAfter).to.equal(WITHDRAW_AMOUNT);
   });
 });

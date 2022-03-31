@@ -29,7 +29,6 @@ pub mod coin_flip {
     }
 
     pub fn deposit(ctx: Context<Deposit>, args: DepositArgs) -> Result<()> {
-        let core_state = &ctx.accounts.core_state;
         let admin = &ctx.accounts.admin;
         let vault_authority = &ctx.accounts.vault_authority;
         let token_mint = &ctx.accounts.token_mint;
@@ -37,30 +36,12 @@ pub mod coin_flip {
         let vault_token_account = &ctx.accounts.vault_token_account;
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
-        let rent = &ctx.accounts.rent;
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
 
-        let vault_auth_seeds: &[&[u8]] = &[
-            VAULT_AUTH_SEED.as_bytes().as_ref(),
-            &[core_state.vault_auth_nonce],
-        ];
-
-        utils::create_program_token_account_if_not_present(
-            vault_token_account,
-            system_program,
-            &admin,
-            token_program,
-            token_mint,
-            &vault_authority,
-            rent,
-            vault_auth_seeds,// admin seeds
-            &[&[]],// admin seeds
-            is_native,
-        )?;
-
         if !is_native {
             utils::assert_is_ata(&admin_token_account, &admin.key(), &token_mint.key())?;
+            // utils::assert_is_ata(&vault_token_account, &vault_authority.key(), &token_mint.key())?;
             anchor_lang::solana_program::program::invoke(
                 &spl_token::instruction::transfer(
                     &token_program.key(),
@@ -79,6 +60,7 @@ pub mod coin_flip {
             )?;
         } else {
             utils::assert_keys_equal(admin_token_account.key(), admin.key())?;
+            utils::assert_keys_equal(vault_token_account.key(), vault_authority.key())?;
             anchor_lang::solana_program::program::invoke(
                 &anchor_lang::solana_program::system_instruction::transfer(
                     &admin_token_account.key(),
@@ -97,12 +79,81 @@ pub mod coin_flip {
     }
 
     pub fn withdraw(ctx: Context<Withdraw>, args: WithdrawArgs) -> Result<()> {
+        let core_state = &ctx.accounts.core_state;
+        let admin = &ctx.accounts.admin;
+        let vault_authority = &ctx.accounts.vault_authority;
+        let token_mint = &ctx.accounts.token_mint;
+        let admin_token_account = &ctx.accounts.admin_token_account;
+        let vault_token_account = &ctx.accounts.vault_token_account;
+        let token_program = &ctx.accounts.token_program;
+        let system_program = &ctx.accounts.system_program;
+
+        let is_native = token_mint.key() == spl_token::native_mint::id();
+
+        let _vault_auth_seeds = vault_authority! {
+            bump = core_state.vault_auth_nonce
+        };
+
+        let admin_key = admin.key();
+
+        let vault_auth_seeds = [
+            VAULT_AUTH_SEED.as_bytes(),
+            admin_key.as_ref(),
+            &[core_state.vault_auth_nonce],
+        ];
+
+        if !is_native {
+            utils::assert_is_ata(&admin_token_account, &admin.key(), &token_mint.key())?;
+            // utils::assert_is_ata(&vault_token_account, &vault_authority.key(), &token_mint.key())?;
+            anchor_lang::solana_program::program::invoke_signed(
+                &spl_token::instruction::transfer(
+                    &token_program.key(),
+                    &vault_token_account.key(),
+                    &admin_token_account.key(),
+                    &vault_authority.key(),
+                    &[],
+                    args.amount,
+                )?,
+                &[
+                    vault_token_account.to_account_info(),
+                    admin_token_account.to_account_info(),
+                    token_program.to_account_info(),
+                    vault_authority.to_account_info(),
+                ],
+                &[&vault_auth_seeds],
+            )?;
+        } else {
+            utils::assert_keys_equal(admin_token_account.key(), admin.key())?;
+            utils::assert_keys_equal(vault_token_account.key(), vault_authority.key())?;
+            anchor_lang::solana_program::program::invoke_signed(
+                &anchor_lang::solana_program::system_instruction::transfer(
+                    &vault_token_account.key(),
+                    &admin_token_account.key(),
+                    args.amount,
+                ),
+                &[
+                    vault_token_account.to_account_info(),
+                    admin_token_account.to_account_info(),
+                    system_program.to_account_info(),
+                    admin.to_account_info(),
+                ],
+                &[&vault_auth_seeds],
+            )?;
+        }
+
         Ok(())
     }
 
     pub fn bet(ctx: Context<Bet>, args: BetArgs) -> Result<()> {
         Ok(())
     }
+}
+
+#[macro_export]
+macro_rules! vault_authority {
+    (bump = $bump:expr) => {
+        &[VAULT_AUTH_SEED.as_bytes().as_ref(), &[$bump]]
+    };
 }
 
 // -------------------------------------------------------------------------------- //
@@ -117,18 +168,15 @@ pub struct Initialize<'info> {
     #[account(
         init,
         space = 8 + 1 + 1 + 8 + std::mem::size_of::<Pubkey>(),
-        seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump,
         payer = admin,
     )]
     pub core_state: Account<'info, CoreState>,
     /// CHECK: 
     #[account(
-        init,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
-        bump,
-        space = 8,
-        payer = admin,
+        seeds = [VAULT_AUTH_SEED.as_bytes(), admin.key().as_ref()],
+        bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
@@ -138,7 +186,7 @@ pub struct Initialize<'info> {
 #[instruction(args: RegisterArgs)]
 pub struct Register<'info> {
     #[account(
-        seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
@@ -151,7 +199,7 @@ pub struct Register<'info> {
     /// CHECK:
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -159,7 +207,7 @@ pub struct Register<'info> {
         init,
         token::mint = token_mint,
         token::authority = vault_authority,
-        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes().as_ref(), token_mint.key().as_ref(), admin.key().as_ref()],
+        seeds = [VAULT_TOKEN_ACCOUNT_SEED.as_bytes(), token_mint.key().as_ref(), admin.key().as_ref()],
         bump,
         payer = admin,
     )]
@@ -173,7 +221,7 @@ pub struct Register<'info> {
 #[instruction(args: DepositArgs)]
 pub struct Deposit<'info> {
     #[account(
-        seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
@@ -185,7 +233,7 @@ pub struct Deposit<'info> {
     /// CHECK:
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
@@ -199,14 +247,13 @@ pub struct Deposit<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
 #[instruction(args: WithdrawArgs)]
 pub struct Withdraw<'info> {
     #[account(
-        seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
@@ -218,18 +265,17 @@ pub struct Withdraw<'info> {
     /// CHECK:
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
     pub token_mint: Account<'info, Mint>,
-    #[account(
-        mut,
-        constraint = admin_token_account.owner == admin.key() @ ErrorCode::TokenOnwerMismatch,
-        constraint = admin_token_account.mint == token_mint.key() @ ErrorCode::TokenOnwerMismatch,
-        constraint = admin_token_account.amount >= args.amount @ ErrorCode::InsufficientFunds,
-    )]
-    pub admin_token_account: Account<'info, TokenAccount>,
+    /// CHECK:
+    #[account(mut)]
+    pub admin_token_account: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub vault_token_account: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -239,7 +285,7 @@ pub struct Withdraw<'info> {
 #[instruction(args: BetArgs)]
 pub struct Bet<'info> {
     #[account(
-        seeds = [CORE_STATE_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = args.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
@@ -252,7 +298,7 @@ pub struct Bet<'info> {
     /// CHECK:
     #[account(
         mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes().as_ref(), admin.key().as_ref()],
+        seeds = [VAULT_AUTH_SEED.as_bytes(), admin.key().as_ref()],
         bump = args.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,

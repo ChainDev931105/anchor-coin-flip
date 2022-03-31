@@ -63,7 +63,7 @@ export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: numb
     vaultTokenAccount = _vaultTokenAccount;
   }
     
-  await program.rpc.deposit({
+  let tx = await program.rpc.deposit({
     amount: new anchor.BN(amount)
   }, {
     accounts: {
@@ -75,29 +75,41 @@ export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: numb
       vaultTokenAccount,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
-      rent: SYSVAR_RENT_PUBKEY
     },
     signers: [admin]
   });
-  return coreState;
+  return tx;
 }
 
 export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
-  // await program.rpc.withdraw({
-  //   coreStateNonce,
-  //   vaultAuthNonce,
-  //   amount: new anchor.BN(amount)
-  // }, {
-  //   accounts: {
-  //     admin: admin.publicKey,
-  //     vaultAuthority,
-  //     systemProgram: SystemProgram.programId
-  //   },
-  //   signers: [admin]
-  // });
-  return coreState;
+  
+  let adminTokenAccount = (tokenMint == NATIVE_MINT) ? 
+    admin.publicKey : (await getAssociatedTokenAddress(tokenMint, admin.publicKey));
+  let vaultTokenAccount;
+  if (tokenMint === NATIVE_MINT) vaultTokenAccount = vaultAuthority;
+  else {
+    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+    vaultTokenAccount = _vaultTokenAccount;
+  }
+    
+  let tx = await program.rpc.withdraw({
+    amount: new anchor.BN(amount)
+  }, {
+    accounts: {
+      coreState,
+      admin: admin.publicKey,
+      vaultAuthority,
+      tokenMint,
+      adminTokenAccount,
+      vaultTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    },
+    signers: [admin]
+  });
+  return tx;
 }
 
 export async function bet(admin: Keypair, amount: number) {
