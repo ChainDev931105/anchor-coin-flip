@@ -112,20 +112,35 @@ export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: num
   return tx;
 }
 
-export async function bet(admin: Keypair, amount: number) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
-  // await program.rpc.withdraw({
-  //   coreStateNonce,
-  //   vaultAuthNonce,
-  //   amount: new anchor.BN(amount)
-  // }, {
-  //   accounts: {
-  //     admin: admin.publicKey,
-  //     vaultAuthority,
-  //     systemProgram: SystemProgram.programId
-  //   },
-  //   signers: [admin]
-  // });
+export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, fee: number, betSide: boolean) {
+  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
+  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
+  
+  let userTokenAccount = (tokenMint == NATIVE_MINT) ? 
+    user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));
+  let vaultTokenAccount;
+  if (tokenMint === NATIVE_MINT) vaultTokenAccount = vaultAuthority;
+  else {
+    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin);
+    vaultTokenAccount = _vaultTokenAccount;
+  }
+
+  await program.rpc.bet({
+    amount: new anchor.BN(amount),
+    fee: new anchor.BN(fee),
+    betSide
+  }, {
+    accounts: {
+      coreState,
+      user: user.publicKey,
+      vaultAuthority,
+      tokenMint,
+      userTokenAccount,
+      vaultTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    },
+    signers: [user]
+  });
   return coreState;
 }

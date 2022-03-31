@@ -3,6 +3,8 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token::{self, TokenAccount, Burn, Mint, MintTo, Token, Transfer},
 };
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 declare_id!("5G2vmwuHzznDrRQYHsK4FfXJscPMHUSqZvouCHa9SnQ7");
 
@@ -41,7 +43,6 @@ pub mod coin_flip {
 
         if !is_native {
             utils::assert_is_ata(&admin_token_account, &admin.key(), &token_mint.key())?;
-            // utils::assert_is_ata(&vault_token_account, &vault_authority.key(), &token_mint.key())?;
             anchor_lang::solana_program::program::invoke(
                 &spl_token::instruction::transfer(
                     &token_program.key(),
@@ -90,21 +91,14 @@ pub mod coin_flip {
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
 
-        let _vault_auth_seeds = vault_authority! {
-            bump = core_state.vault_auth_nonce
-        };
-
-        let admin_key = admin.key();
-
         let vault_auth_seeds = [
             VAULT_AUTH_SEED.as_bytes(),
-            admin_key.as_ref(),
+            core_state.admin.as_ref(),
             &[core_state.vault_auth_nonce],
         ];
 
         if !is_native {
             utils::assert_is_ata(&admin_token_account, &admin.key(), &token_mint.key())?;
-            // utils::assert_is_ata(&vault_token_account, &vault_authority.key(), &token_mint.key())?;
             anchor_lang::solana_program::program::invoke_signed(
                 &spl_token::instruction::transfer(
                     &token_program.key(),
@@ -145,15 +139,112 @@ pub mod coin_flip {
     }
 
     pub fn bet(ctx: Context<Bet>, args: BetArgs) -> Result<()> {
+        ctx.accounts.core_state.flip_counter += 1;
+
+        let core_state = &ctx.accounts.core_state;
+        let user = &ctx.accounts.user;
+        let vault_authority = &ctx.accounts.vault_authority;
+        let token_mint = &ctx.accounts.token_mint;
+        let user_token_account = &ctx.accounts.user_token_account;
+        let vault_token_account = &ctx.accounts.vault_token_account;
+        let token_program = &ctx.accounts.token_program;
+        let system_program = &ctx.accounts.system_program;
+
+        let is_native = token_mint.key() == spl_token::native_mint::id();
+
+        if !is_native {
+            utils::assert_is_ata(&user_token_account, &user.key(), &token_mint.key())?;
+            anchor_lang::solana_program::program::invoke(
+                &spl_token::instruction::transfer(
+                    &token_program.key(),
+                    &user_token_account.key(),
+                    &vault_token_account.key(),
+                    &user.key(),
+                    &[],
+                    args.amount,
+                )?,
+                &[
+                    vault_token_account.to_account_info(),
+                    user_token_account.to_account_info(),
+                    token_program.to_account_info(),
+                    user.to_account_info(),
+                ],
+            )?;
+        } else {
+            utils::assert_keys_equal(user_token_account.key(), user.key())?;
+            utils::assert_keys_equal(vault_token_account.key(), vault_authority.key())?;
+            anchor_lang::solana_program::program::invoke(
+                &anchor_lang::solana_program::system_instruction::transfer(
+                    &user_token_account.key(),
+                    &vault_token_account.key(),
+                    args.amount,
+                ),
+                &[
+                    vault_token_account.to_account_info(),
+                    user_token_account.to_account_info(),
+                    system_program.to_account_info(),
+                ],
+            )?;
+        }
+
+        let clock = (Clock::get()?).unix_timestamp as u64;
+
+        let mut hasher = DefaultHasher::new();
+        [clock, core_state.flip_counter].hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if ((hash == 0) ^ args.bet_side) {
+            let vault_auth_seeds = [
+                VAULT_AUTH_SEED.as_bytes(),
+                core_state.admin.as_ref(),
+                &[core_state.vault_auth_nonce],
+            ];
+    
+            if !is_native {
+                utils::assert_is_ata(&user_token_account, &user.key(), &token_mint.key())?;
+                anchor_lang::solana_program::program::invoke_signed(
+                    &spl_token::instruction::transfer(
+                        &token_program.key(),
+                        &vault_token_account.key(),
+                        &user_token_account.key(),
+                        &vault_authority.key(),
+                        &[],
+                        2 * args.amount - args.fee,
+                    )?,
+                    &[
+                        vault_token_account.to_account_info(),
+                        user_token_account.to_account_info(),
+                        token_program.to_account_info(),
+                        vault_authority.to_account_info(),
+                    ],
+                    &[&vault_auth_seeds],
+                )?;
+            } else {
+                utils::assert_keys_equal(user_token_account.key(), user.key())?;
+                utils::assert_keys_equal(vault_token_account.key(), vault_authority.key())?;
+                anchor_lang::solana_program::program::invoke_signed(
+                    &anchor_lang::solana_program::system_instruction::transfer(
+                        &vault_token_account.key(),
+                        &user_token_account.key(),
+                        2 * args.amount - args.fee,
+                    ),
+                    &[
+                        vault_token_account.to_account_info(),
+                        user_token_account.to_account_info(),
+                        system_program.to_account_info(),
+                        user.to_account_info(),
+                    ],
+                    &[&vault_auth_seeds],
+                )?;
+            }
+            msg!("Congratulations, You won!");
+        }
+        else {
+            msg!("Sorry, You lost!");
+        }
+
         Ok(())
     }
-}
-
-#[macro_export]
-macro_rules! vault_authority {
-    (bump = $bump:expr) => {
-        &[VAULT_AUTH_SEED.as_bytes().as_ref(), &[$bump]]
-    };
 }
 
 // -------------------------------------------------------------------------------- //
@@ -285,35 +376,27 @@ pub struct Withdraw<'info> {
 #[instruction(args: BetArgs)]
 pub struct Bet<'info> {
     #[account(
-        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
-        bump = args.core_state_nonce,
+        mut,
+        seeds = [CORE_STATE_SEED.as_bytes(), core_state.admin.as_ref()],
+        bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
+    #[account(mut)]
+    pub user: Signer<'info>,
     /// CHECK:
     #[account(
         mut,
-        constraint = admin.key() == core_state.admin @ ErrorCode::WrongAdmin,
-    )]
-    pub admin: AccountInfo<'info>,
-    /// CHECK:
-    #[account(
-        mut,
-        seeds = [VAULT_AUTH_SEED.as_bytes(), admin.key().as_ref()],
-        bump = args.vault_auth_nonce,
+        seeds = [VAULT_AUTH_SEED.as_bytes(), core_state.admin.as_ref()],
+        bump = core_state.vault_auth_nonce,
     )]
     pub vault_authority: AccountInfo<'info>,
-    #[account(mut)]
-    pub user_authority: Signer<'info>,
-    #[account(
-        constraint = token_mint.key() == args.token_mint @ ErrorCode::TokenMintMismatch,
-    )]
     pub token_mint: Account<'info, Mint>,
-    #[account(
-        mut,
-        constraint = user_token_account.owner == user_authority.key() @ ErrorCode::TokenOnwerMismatch,
-        constraint = user_token_account.mint == token_mint.key() @ ErrorCode::TokenOnwerMismatch,
-    )]
-    pub user_token_account: Account<'info, TokenAccount>,
+    /// CHECK:
+    #[account(mut)]
+    pub user_token_account: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub vault_token_account: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -346,11 +429,9 @@ pub struct WithdrawArgs {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct BetArgs {
-    pub core_state_nonce: u8,
-    pub vault_auth_nonce: u8,
     pub amount: u64,
+    pub fee: u64,
     pub bet_side: bool, // true = Head, false = Tail
-    pub token_mint: Pubkey,
 }
 
 // -------------------------------------------------------------------------------- //

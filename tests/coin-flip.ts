@@ -8,7 +8,8 @@ import {
   initialize,
   register,
   deposit,
-  withdraw
+  withdraw,
+  bet
 } from './coin-flip_instruction';
 import {
   getVaultTokenAccount
@@ -21,14 +22,19 @@ describe('coin-flip', () => {
   const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
   
   const admin = Keypair.generate();
+  const user = Keypair.generate();
   const tokenMintAuthority = Keypair.generate();
-  const AIRDROP_AMOUNT = 1000_000_000;
+  const AIRDROP_AMOUNT = 1_000_000_000;
   const DEPOSIT_AMOUNT = 100_000_000;
   const WITHDRAW_AMOUNT = 50_000_000;
+  const BET_AMOUNT = 5_000_000;
+  const FEE = 1_000_000;
   let vaultAuth;
   let tokenMint;
   let adminTokenAccount;
   let vaultTokenAccount;
+  let userTokenAccount;
+  let coreStateAddress;
 
   it('Is initialized!', async () => {
     // airdrop to admin account
@@ -42,8 +48,9 @@ describe('coin-flip', () => {
 
     // initialize
     const { coreState, vaultAuthority } = await initialize(admin);
+    coreStateAddress = coreState;
     vaultAuth = vaultAuthority;
-    console.log("Core State: ", await program.account.coreState.fetch(coreState));
+    console.log("Core State: ", await program.account.coreState.fetch(coreStateAddress));
     console.log("Vault Authority: ", vaultAuthority.toBase58());
   });
 
@@ -117,5 +124,55 @@ describe('coin-flip', () => {
 
     const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(vaultTokenAccount)).value.amount);
     expect(balanceBefore - balanceAfter).to.equal(WITHDRAW_AMOUNT);
+  });
+
+  it('Bet Sol', async () => {
+    // airdrop to user account
+    await program.provider.connection.confirmTransaction(
+      await program.provider.connection.requestAirdrop(
+        user.publicKey,
+        AIRDROP_AMOUNT
+      ),
+      "confirmed"
+    );
+
+    for (let i = 0; i < 10; i++) {
+      const balanceBefore = await provider.connection.getBalance(user.publicKey);
+  
+      await bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT, FEE, (i % 2) === 0);
+  
+      const balanceAfter = await provider.connection.getBalance(user.publicKey);
+      let flipCounter = (await program.account.coreState.fetch(coreStateAddress)).flipCounter;
+      console.log("try", i + 1, {balanceBefore, balanceAfter, flipCounter});
+    }
+  });
+
+  it('Bet Spl', async () => {
+  // create user token account
+  userTokenAccount = await createAssociatedTokenAccount(
+    provider.connection,
+    user,
+    tokenMint,
+    user.publicKey
+  );
+
+  // mint to user
+  await mintTo(
+    provider.connection,
+    user,
+    tokenMint,
+    userTokenAccount,
+    tokenMintAuthority,
+    DEPOSIT_AMOUNT
+  );
+    for (let i = 0; i < 10; i++) {
+      const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+
+      await bet(admin.publicKey, user, tokenMint, BET_AMOUNT, FEE, (i % 2) === 0);
+      
+      const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+      let flipCounter = (await program.account.coreState.fetch(coreStateAddress)).flipCounter;
+      console.log("try", i + 1, {balanceBefore, balanceAfter, flipCounter});
+    }
   });
 });
