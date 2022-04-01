@@ -11,12 +11,13 @@ import {
 
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
 
-export async function initialize(admin: Keypair) {
+export async function initialize(admin: Keypair, feePercent: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
   await program.rpc.initialize({
     coreStateNonce,
-    vaultAuthNonce
+    vaultAuthNonce,
+    feePercent
   }, {
     accounts: {
       admin: admin.publicKey,
@@ -112,7 +113,7 @@ export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: num
   return tx;
 }
 
-export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, fee: number, betSide: boolean) {
+export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, betSide: boolean) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
   
@@ -127,7 +128,6 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
 
   await program.rpc.bet({
     amount: new anchor.BN(amount),
-    fee: new anchor.BN(fee),
     betSide
   }, {
     accounts: {

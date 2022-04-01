@@ -23,6 +23,7 @@ pub mod coin_flip {
         ctx.accounts.core_state.core_state_nonce = args.core_state_nonce;
         ctx.accounts.core_state.vault_auth_nonce = args.vault_auth_nonce;
         ctx.accounts.core_state.flip_counter = 0;
+        ctx.accounts.core_state.fee_percent = args.fee_percent;
         Ok(())
     }
 
@@ -142,6 +143,7 @@ pub mod coin_flip {
         ctx.accounts.core_state.flip_counter += 1;
 
         let core_state = &ctx.accounts.core_state;
+        let fee = args.amount * (core_state.fee_percent as u64) / 100;
         let user = &ctx.accounts.user;
         let vault_authority = &ctx.accounts.vault_authority;
         let token_mint = &ctx.accounts.token_mint;
@@ -209,7 +211,7 @@ pub mod coin_flip {
                         &user_token_account.key(),
                         &vault_authority.key(),
                         &[],
-                        2 * args.amount - args.fee,
+                        2 * args.amount - fee,
                     )?,
                     &[
                         vault_token_account.to_account_info(),
@@ -226,7 +228,7 @@ pub mod coin_flip {
                     &anchor_lang::solana_program::system_instruction::transfer(
                         &vault_token_account.key(),
                         &user_token_account.key(),
-                        2 * args.amount - args.fee,
+                        2 * args.amount - fee,
                     ),
                     &[
                         vault_token_account.to_account_info(),
@@ -258,7 +260,7 @@ pub struct Initialize<'info> {
     pub admin: Signer<'info>,
     #[account(
         init,
-        space = 8 + 1 + 1 + 8 + std::mem::size_of::<Pubkey>(),
+        space = 8 + 1 + 1 + 8 + 1 + std::mem::size_of::<Pubkey>(),
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump,
         payer = admin,
@@ -410,6 +412,7 @@ pub struct Bet<'info> {
 pub struct InitializeArgs {
     pub core_state_nonce: u8,
     pub vault_auth_nonce: u8,
+    pub fee_percent: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -430,7 +433,6 @@ pub struct WithdrawArgs {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct BetArgs {
     pub amount: u64,
-    pub fee: u64,
     pub bet_side: bool, // true = Head, false = Tail
 }
 
@@ -445,6 +447,7 @@ pub struct CoreState {
     pub vault_auth_nonce: u8,
     pub admin: Pubkey, // admin public key
     pub flip_counter: u64,
+    pub fee_percent: u8,
 }
 
 #[error_code]
