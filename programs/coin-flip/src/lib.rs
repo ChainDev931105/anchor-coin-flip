@@ -6,7 +6,7 @@ use anchor_spl::{
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-declare_id!("5G2vmwuHzznDrRQYHsK4FfXJscPMHUSqZvouCHa9SnQ7");
+declare_id!("7JzbC2esufYycEdjENMrG8nuTaDpb9dXkKcn7TtQxLn7");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
