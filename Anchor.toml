@@ -1,14 +1,14 @@
 [features]
 seeds = false
 [programs.localnet]
-coin_flip = "7JzbC2esufYycEdjENMrG8nuTaDpb9dXkKcn7TtQxLn7"
+coin_flip = "EqKgPRJtczadAPUA84JFu2jUekqFEtYTTijiPpwfvGHC"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "localnet"
-wallet = "/Users/anodaram/.config/solana/id.json"
+wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

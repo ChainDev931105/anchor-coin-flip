@@ -6,7 +6,7 @@ use anchor_spl::{
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-declare_id!("7JzbC2esufYycEdjENMrG8nuTaDpb9dXkKcn7TtQxLn7");
+declare_id!("EqKgPRJtczadAPUA84JFu2jUekqFEtYTTijiPpwfvGHC");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
@@ -195,7 +195,7 @@ pub mod coin_flip {
         [clock, core_state.flip_counter].hash(&mut hasher);
         let hash = hasher.finish();
 
-        if ((hash == 0) ^ args.bet_side) {
+        if ((hash % 2 == 0) ^ args.bet_side) {
             let vault_auth_seeds = [
                 VAULT_AUTH_SEED.as_bytes(),
                 core_state.admin.as_ref(),
