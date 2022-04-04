@@ -11,6 +11,7 @@ declare_id!("EqKgPRJtczadAPUA84JFu2jUekqFEtYTTijiPpwfvGHC");
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
 pub const VAULT_TOKEN_ACCOUNT_SEED: &str = "vault-token-account";
+pub const BET_STATE_SEED: &str = "bet-state";
 
 pub mod utils;
 
@@ -27,7 +28,7 @@ pub mod coin_flip {
         Ok(())
     }
 
-    pub fn register(ctx: Context<Register>, args: RegisterArgs) -> Result<()> {
+    pub fn register(_ctx: Context<Register>, _args: RegisterArgs) -> Result<()> {
         Ok(())
     }
 
@@ -143,7 +144,6 @@ pub mod coin_flip {
         ctx.accounts.core_state.flip_counter += 1;
 
         let core_state = &ctx.accounts.core_state;
-        let fee = args.amount * (core_state.fee_percent as u64) / 100;
         let user = &ctx.accounts.user;
         let vault_authority = &ctx.accounts.vault_authority;
         let token_mint = &ctx.accounts.token_mint;
@@ -189,13 +189,41 @@ pub mod coin_flip {
             )?;
         }
 
+        ctx.accounts.bet_state.core_state = core_state.key();
+        ctx.accounts.bet_state.bet_state_nonce = args.bet_state_nonce;
+        ctx.accounts.bet_state.user = user.key();
+        ctx.accounts.bet_state.token_mint = token_mint.key();
+        ctx.accounts.bet_state.amount = args.amount;
+        ctx.accounts.bet_state.bet_side = args.bet_side;
+        ctx.accounts.bet_state.flip_counter = args.flip_counter;
+        ctx.accounts.bet_state.approved = true;
+
+        Ok(())
+    }
+
+    pub fn bet_return(ctx: Context<BetReturn>) -> Result<()> {
+        ctx.accounts.bet_state.approved = false;
+
+        let core_state = &ctx.accounts.core_state;
+        let bet_state = &ctx.accounts.bet_state;
+        let fee = bet_state.amount * (core_state.fee_percent as u64) / 100;
+        let user = &ctx.accounts.user;
+        let vault_authority = &ctx.accounts.vault_authority;
+        let token_mint = &ctx.accounts.token_mint;
+        let user_token_account = &ctx.accounts.user_token_account;
+        let vault_token_account = &ctx.accounts.vault_token_account;
+        let token_program = &ctx.accounts.token_program;
+        let system_program = &ctx.accounts.system_program;
+
         let clock = (Clock::get()?).unix_timestamp as u64;
 
+        let is_native = token_mint.key() == spl_token::native_mint::id();
+
         let mut hasher = DefaultHasher::new();
-        [clock, core_state.flip_counter].hash(&mut hasher);
+        [clock, core_state.flip_counter as u64].hash(&mut hasher);
         let hash = hasher.finish();
 
-        if ((hash % 2 == 0) ^ args.bet_side) {
+        if (hash % 2 == 0) ^ bet_state.bet_side {
             let vault_auth_seeds = [
                 VAULT_AUTH_SEED.as_bytes(),
                 core_state.admin.as_ref(),
@@ -211,7 +239,7 @@ pub mod coin_flip {
                         &user_token_account.key(),
                         &vault_authority.key(),
                         &[],
-                        2 * args.amount - fee,
+                        2 * bet_state.amount - fee,
                     )?,
                     &[
                         vault_token_account.to_account_info(),
@@ -228,7 +256,7 @@ pub mod coin_flip {
                     &anchor_lang::solana_program::system_instruction::transfer(
                         &vault_token_account.key(),
                         &user_token_account.key(),
-                        2 * args.amount - fee,
+                        2 * bet_state.amount - fee,
                     ),
                     &[
                         vault_token_account.to_account_info(),
@@ -244,7 +272,7 @@ pub mod coin_flip {
         else {
             msg!("Sorry, You lost!");
         }
-
+        
         Ok(())
     }
 }
@@ -382,7 +410,7 @@ pub struct Bet<'info> {
         seeds = [CORE_STATE_SEED.as_bytes(), core_state.admin.as_ref()],
         bump = core_state.core_state_nonce,
     )]
-    pub core_state: Account<'info, CoreState>,
+    pub core_state: Box<Account<'info, CoreState>>,
     #[account(mut)]
     pub user: Signer<'info>,
     /// CHECK:
@@ -399,9 +427,60 @@ pub struct Bet<'info> {
     /// CHECK:
     #[account(mut)]
     pub vault_token_account: UncheckedAccount<'info>,
+    #[account(
+        init,
+        space = 8 + 1 + 8 + 1 + 8 + 1 + 3 * std::mem::size_of::<Pubkey>(),
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), &args.flip_counter.to_le_bytes()],
+        bump,
+        payer = user,
+    )]
+    pub bet_state: Box<Account<'info, BetState>>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct BetReturn<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [CORE_STATE_SEED.as_bytes(), core_state.admin.as_ref()],
+        bump = core_state.core_state_nonce,
+    )]
+    pub core_state: Box<Account<'info, CoreState>>,
+    /// CHECK:
+    #[account(mut)]
+    pub user: AccountInfo<'info>,
+    /// CHECK:
+    #[account(
+        mut,
+        seeds = [VAULT_AUTH_SEED.as_bytes(), core_state.admin.as_ref()],
+        bump = core_state.vault_auth_nonce,
+    )]
+    pub vault_authority: AccountInfo<'info>,
+    pub token_mint: Account<'info, Mint>,
+    /// CHECK:
+    #[account(mut)]
+    pub user_token_account: UncheckedAccount<'info>,
+    /// CHECK:
+    #[account(mut)]
+    pub vault_token_account: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = bet_state.approved @ ErrorCode::UnapprovedBet,
+        constraint = bet_state.core_state == core_state.key() @ ErrorCode::InvalidCoreState,
+        constraint = bet_state.token_mint == token_mint.key() @ ErrorCode::InvalidTokenMint,
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), &bet_state.flip_counter.to_le_bytes()],
+        bump = bet_state.bet_state_nonce,
+    )]
+    pub bet_state: Box<Account<'info, BetState>>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 // -------------------------------------------------------------------------------- //
@@ -434,6 +513,8 @@ pub struct WithdrawArgs {
 pub struct BetArgs {
     pub amount: u64,
     pub bet_side: bool, // true = Head, false = Tail
+    pub flip_counter: u64,
+    pub bet_state_nonce: u8,
 }
 
 // -------------------------------------------------------------------------------- //
@@ -448,6 +529,19 @@ pub struct CoreState {
     pub admin: Pubkey, // admin public key
     pub flip_counter: u64,
     pub fee_percent: u8,
+}
+
+#[account]
+#[derive(Default)]
+pub struct BetState {
+    pub bet_state_nonce: u8,
+    pub core_state: Pubkey,
+    pub user: Pubkey,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+    pub bet_side: bool, // true = Head, false = Tail
+    pub flip_counter: u64,
+    pub approved: bool, // originally false. set true after transfer
 }
 
 #[error_code]
@@ -466,4 +560,10 @@ pub enum ErrorCode {
     UninitializedAccount,
     #[msg("PublicKey Mismatch")]
     PublicKeyMismatch,
+    #[msg("Unapproved Bet")]
+    UnapprovedBet,
+    #[msg("Invalid CoreState")]
+    InvalidCoreState,
+    #[msg("Invalid TokenMint")]
+    InvalidTokenMint,
 }

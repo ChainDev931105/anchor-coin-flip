@@ -6,7 +6,8 @@ import { CoinFlip } from '../target/types/coin_flip';
 import {
   getCoreState,
   getVaultAuth,
-  getVaultTokenAccount
+  getVaultTokenAccount,
+  getBetState
 } from './coin-flip_pda';
 
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
@@ -137,6 +138,8 @@ export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: num
 export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, betSide: boolean) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
+  let flipCounter = parseInt((await program.account.coreState.fetch(coreState)).flipCounter);
+  let [betState, betStateNonce] = await getBetState(program.programId, admin, flipCounter);
   
   let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
     user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));
@@ -149,7 +152,9 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
 
   await program.rpc.bet({
     amount: new anchor.BN(amount),
-    betSide
+    betSide,
+    flipCounter: new anchor.BN(flipCounter),
+    betStateNonce
   }, {
     accounts: {
       coreState,
@@ -158,10 +163,46 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
       tokenMint,
       userTokenAccount,
       vaultTokenAccount,
+      betState,
       tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY
     },
     signers: [user]
   });
-  return coreState;
+  return betState;
+}
+
+export async function betReturn(admin: Keypair, betState: PublicKey) {
+  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
+  let { betStateNonce, user, flipCounter, tokenMint } = (await program.account.betState.fetch(betState));
+
+  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  
+  let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+    user : (await getAssociatedTokenAddress(tokenMint, user));
+  let vaultTokenAccount;
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
+  else {
+    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+    vaultTokenAccount = _vaultTokenAccount;
+  }
+
+  await program.rpc.betReturn({
+    accounts: {
+      admin: admin.publicKey,
+      coreState,
+      user,
+      vaultAuthority,
+      tokenMint,
+      userTokenAccount,
+      vaultTokenAccount,
+      betState,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY
+    },
+    signers: [admin]
+  });
+  return betState;
 }
