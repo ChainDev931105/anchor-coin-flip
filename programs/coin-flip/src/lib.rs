@@ -5,9 +5,10 @@ use anchor_lang::{
         slot_hashes,
     },
 };
+use spl_token::instruction::close_account;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{self, TokenAccount, Burn, Mint, MintTo, Token, Transfer},
+    token::{self, Burn, CloseAccount, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
@@ -214,9 +215,36 @@ pub mod coin_flip {
         Ok(())
     }
 
+    pub fn close_bet_state(ctx: Context<CloseBetState>) -> Result<()> {
+        // close pda
+        // let cpi_accounts = CloseAccount {
+        //     account: ctx.accounts.bet_state.to_account_info().clone(),
+        //     destination: ctx.accounts.user.to_account_info().clone(),
+        //     authority: ctx.accounts.user.to_account_info().clone(),
+        // };
+        // let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info().clone(), cpi_accounts);
+        // token::close_account(cpi_context)?;
+        let ix = close_account(
+            &ctx.accounts.token_program.key(),
+            &ctx.accounts.bet_state.key(),
+            &ctx.accounts.user.key(),
+            &ctx.accounts.user.key(),
+            &[]
+        )?;
+        anchor_lang::solana_program::program::invoke_signed(&ix, &[
+            ctx.accounts.bet_state.to_account_info().clone(),
+            ctx.accounts.user.to_account_info().clone(),
+            ctx.accounts.user.to_account_info().clone(),
+            ctx.accounts.token_program.to_account_info().clone(),
+        ], &[])?;
+
+        Ok(())
+    }
+
     pub fn bet_return(ctx: Context<BetReturn>) -> Result<()> {
         ctx.accounts.bet_state.approved = false;
 
+        let admin = &ctx.accounts.admin;
         let core_state = &ctx.accounts.core_state;
         let bet_state = &ctx.accounts.bet_state;
         let fee = bet_state.amount * (core_state.fee_percent as u64) / 100;
@@ -292,6 +320,15 @@ pub mod coin_flip {
         else {
             msg!("Sorry, You lost!");
         }
+
+        // close pda
+        // let cpi_accounts = CloseAccount {
+        //     account: bet_state.to_account_info().clone(),
+        //     destination: admin.to_account_info().clone(),
+        //     authority: admin.to_account_info().clone(),
+        // };
+        // let cpi_context = CpiContext::new(token_program.to_account_info().clone(), cpi_accounts);
+        // token::close_account(cpi_context)?;
         
         Ok(())
     }
@@ -522,6 +559,17 @@ pub struct BetReturn<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct CloseBetState<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    #[account(
+        mut,
+    )]
+    pub bet_state: Box<Account<'info, BetState>>,
+    pub token_program: Program<'info, Token>,
 }
 
 // -------------------------------------------------------------------------------- //
