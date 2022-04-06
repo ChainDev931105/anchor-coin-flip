@@ -355,7 +355,6 @@ pub struct UpdateCoreState<'info> {
         bump = core_state.core_state_nonce,
     )]
     pub core_state: Account<'info, CoreState>,
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

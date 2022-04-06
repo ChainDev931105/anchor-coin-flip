@@ -206,3 +206,19 @@ export async function betReturn(admin: Keypair, betState: PublicKey) {
   });
   return betState;
 }
+
+export async function updateCoreState(admin: Keypair, feePercent: number, active: boolean) {
+  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
+
+  await program.rpc.updateCoreState({
+    feePercent,
+    active
+  }, {
+    accounts: {
+      admin: admin.publicKey,
+      coreState,
+    },
+    signers: [admin]
+  });
+  return coreState;
+}

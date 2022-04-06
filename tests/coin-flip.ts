@@ -10,7 +10,8 @@ import {
   deposit,
   withdraw,
   bet,
-  betReturn
+  betReturn,
+  updateCoreState
 } from './coin-flip_instruction';
 import {
   getVaultTokenAccount
@@ -185,7 +186,10 @@ describe('coin-flip', () => {
     }
   });
 
-  it('Close CoreState', async () => {
+  it('Update CoreState', async () => {
+    const NEW_FEE_PERCENT = 2;
+    const coreState = await updateCoreState(admin, NEW_FEE_PERCENT, false);
 
+    console.log("Core State: ", coreState.toBase58(), await program.account.coreState.fetch(coreState));
   });
 });
