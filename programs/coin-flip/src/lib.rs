@@ -1,14 +1,17 @@
 use anchor_lang::{
     prelude::*,
-    solana_program::sysvar::{
-        recent_blockhashes,
-        slot_hashes,
+    solana_program::{
+        sysvar::{
+            recent_blockhashes,
+            slot_hashes,
+        },
+        program_memory::sol_memset,
     },
 };
 use spl_token::instruction::close_account;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{self, Burn, CloseAccount, Mint, MintTo, Token, TokenAccount, Transfer},
+    token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer},
 };
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
@@ -215,32 +218,6 @@ pub mod coin_flip {
         Ok(())
     }
 
-    pub fn close_bet_state(ctx: Context<CloseBetState>) -> Result<()> {
-        // close pda
-        // let cpi_accounts = CloseAccount {
-        //     account: ctx.accounts.bet_state.to_account_info().clone(),
-        //     destination: ctx.accounts.user.to_account_info().clone(),
-        //     authority: ctx.accounts.user.to_account_info().clone(),
-        // };
-        // let cpi_context = CpiContext::new(ctx.accounts.token_program.to_account_info().clone(), cpi_accounts);
-        // token::close_account(cpi_context)?;
-        let ix = close_account(
-            &ctx.accounts.token_program.key(),
-            &ctx.accounts.bet_state.key(),
-            &ctx.accounts.user.key(),
-            &ctx.accounts.user.key(),
-            &[]
-        )?;
-        anchor_lang::solana_program::program::invoke_signed(&ix, &[
-            ctx.accounts.bet_state.to_account_info().clone(),
-            ctx.accounts.user.to_account_info().clone(),
-            ctx.accounts.user.to_account_info().clone(),
-            ctx.accounts.token_program.to_account_info().clone(),
-        ], &[])?;
-
-        Ok(())
-    }
-
     pub fn bet_return(ctx: Context<BetReturn>) -> Result<()> {
         ctx.accounts.bet_state.approved = false;
 
@@ -322,13 +299,18 @@ pub mod coin_flip {
         }
 
         // close pda
-        // let cpi_accounts = CloseAccount {
-        //     account: bet_state.to_account_info().clone(),
-        //     destination: admin.to_account_info().clone(),
-        //     authority: admin.to_account_info().clone(),
-        // };
-        // let cpi_context = CpiContext::new(token_program.to_account_info().clone(), cpi_accounts);
-        // token::close_account(cpi_context)?;
+        let bet_state_acc = &ctx.accounts.bet_state.to_account_info();
+        let bet_state_data = &mut bet_state_acc.try_borrow_mut_data()?;
+        let cur_lamp = bet_state_acc.lamports();
+
+        **bet_state_acc.lamports.borrow_mut() = 0;
+        sol_memset(&mut *bet_state_data, 0, 1);
+
+        **admin.lamports.borrow_mut() = admin
+            .lamports()
+            .checked_add(cur_lamp)
+            .ok_or(ErrorCode::NumericalOverflow)?;
+
         
         Ok(())
     }
@@ -561,17 +543,6 @@ pub struct BetReturn<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-#[derive(Accounts)]
-pub struct CloseBetState<'info> {
-    #[account(mut)]
-    pub user: Signer<'info>,
-    #[account(
-        mut,
-    )]
-    pub bet_state: Box<Account<'info, BetState>>,
-    pub token_program: Program<'info, Token>,
-}
-
 // -------------------------------------------------------------------------------- //
 // ------------------------------------- Args ------------------------------------- //
 // -------------------------------------------------------------------------------- //
@@ -664,4 +635,6 @@ pub enum ErrorCode {
     InvalidTokenMint,
     #[msg("Not Active CoreState")]
     NotActiveCoreState,
+    #[msg("Numerical Overflow")]
+    NumericalOverflow,
 }

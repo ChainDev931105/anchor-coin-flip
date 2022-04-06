@@ -137,7 +137,7 @@ describe('coin-flip', () => {
       "confirmed"
     );
 
-    for (let i = 0; i < 1; i++) {
+    for (let i = 0; i < 10; i++) {
       const balanceBefore = await provider.connection.getBalance(user.publicKey);
   
       let betState = await bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT, (i % 2) === 0);
@@ -145,52 +145,47 @@ describe('coin-flip', () => {
 
       const balanceAfter = await provider.connection.getBalance(user.publicKey);
       
-      // await betReturn(admin, betState);
-
-        await program.rpc.closeBetState({
-          accounts: {
-            user: user.publicKey,
-            betState,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          },
-          signers: [user]
-        });
+      await betReturn(admin, betState);
 
       const balanceFinal = await provider.connection.getBalance(user.publicKey);
       console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, betStateFetch});
     }
   });
 
-  // it('Bet Spl', async () => {
-  //   // create user token account
-  //   userTokenAccount = await createAssociatedTokenAccount(
-  //     provider.connection,
-  //     user,
-  //     tokenMint,
-  //     user.publicKey
-  //   );
+  it('Bet Spl', async () => {
+    // create user token account
+    userTokenAccount = await createAssociatedTokenAccount(
+      provider.connection,
+      user,
+      tokenMint,
+      user.publicKey
+    );
 
-  //   // mint to user
-  //   await mintTo(
-  //     provider.connection,
-  //     user,
-  //     tokenMint,
-  //     userTokenAccount,
-  //     tokenMintAuthority,
-  //     DEPOSIT_AMOUNT
-  //   );
-  //   for (let i = 0; i < 10; i++) {
-  //     const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+    // mint to user
+    await mintTo(
+      provider.connection,
+      user,
+      tokenMint,
+      userTokenAccount,
+      tokenMintAuthority,
+      DEPOSIT_AMOUNT
+    );
+    for (let i = 0; i < 10; i++) {
+      const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
 
-  //     let betState = await bet(admin.publicKey, user, tokenMint, BET_AMOUNT, (i % 2) === 0);
-  //     let betStateFetch = (await program.account.betState.fetch(betState));
+      let betState = await bet(admin.publicKey, user, tokenMint, BET_AMOUNT, (i % 2) === 0);
+      let betStateFetch = (await program.account.betState.fetch(betState));
       
-  //     const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+      const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
       
-  //     await betReturn(admin, betState);
+      await betReturn(admin, betState);
 
-  //     const balanceFinal = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
-  //     console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, betStateFetch});
-  //   }
-  // });
+      const balanceFinal = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, betStateFetch});
+    }
+  });
+
+  it('Close CoreState', async () => {
+
+  });
 });
