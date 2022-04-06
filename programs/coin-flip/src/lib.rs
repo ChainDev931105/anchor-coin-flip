@@ -1,4 +1,10 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{
+    prelude::*,
+    solana_program::sysvar::{
+        recent_blockhashes,
+        slot_hashes,
+    },
+};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{self, TokenAccount, Burn, Mint, MintTo, Token, Transfer},
@@ -6,7 +12,7 @@ use anchor_spl::{
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-declare_id!("EqKgPRJtczadAPUA84JFu2jUekqFEtYTTijiPpwfvGHC");
+declare_id!("AS68LEJddL4UnwJJG5qEkGJihLEbdqxKj6YUdpLhBaED");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
@@ -220,7 +226,14 @@ pub mod coin_flip {
         let is_native = token_mint.key() == spl_token::native_mint::id();
 
         let mut hasher = DefaultHasher::new();
-        [clock, core_state.flip_counter as u64].hash(&mut hasher);
+
+        let block_hash = recent_blockhashes::id();
+        let slot_hash = slot_hashes::id();
+        [block_hash, slot_hash].hash(&mut hasher);
+        let hash0 = hasher.finish();
+        let mut hasher = DefaultHasher::new();
+        
+        [hash0, clock, core_state.flip_counter as u64].hash(&mut hasher);
         let hash = hasher.finish();
 
         if (hash % 2 == 0) ^ bet_state.bet_side {
