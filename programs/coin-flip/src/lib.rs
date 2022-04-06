@@ -31,6 +31,13 @@ pub mod coin_flip {
         ctx.accounts.core_state.vault_auth_nonce = args.vault_auth_nonce;
         ctx.accounts.core_state.flip_counter = 0;
         ctx.accounts.core_state.fee_percent = args.fee_percent;
+        ctx.accounts.core_state.active = true;
+        Ok(())
+    }
+
+    pub fn update_core_state(ctx: Context<UpdateCoreState>, args: UpdateCoreStateArgs) -> Result<()> {
+        ctx.accounts.core_state.fee_percent = args.fee_percent;
+        ctx.accounts.core_state.active = args.active;
         Ok(())
     }
 
@@ -301,7 +308,7 @@ pub struct Initialize<'info> {
     pub admin: Signer<'info>,
     #[account(
         init,
-        space = 8 + 1 + 1 + 8 + 1 + std::mem::size_of::<Pubkey>(),
+        space = 8 + 1 + 1 + 8 + 1 + 1 + std::mem::size_of::<Pubkey>(),
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump,
         payer = admin,
@@ -317,11 +324,28 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+pub struct UpdateCoreState<'info> {
+    #[account(
+        mut,
+        constraint = core_state.admin == admin.key() @ ErrorCode::WrongAdmin,
+    )]
+    pub admin: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
+        bump = core_state.core_state_nonce,
+    )]
+    pub core_state: Account<'info, CoreState>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(args: RegisterArgs)]
 pub struct Register<'info> {
     #[account(
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.core_state_nonce,
+        constraint = core_state.active @ ErrorCode::NotActiveCoreState,
     )]
     pub core_state: Account<'info, CoreState>,
     #[account(
@@ -357,6 +381,7 @@ pub struct Deposit<'info> {
     #[account(
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.core_state_nonce,
+        constraint = core_state.active @ ErrorCode::NotActiveCoreState,
     )]
     pub core_state: Account<'info, CoreState>,
     #[account(
@@ -389,6 +414,7 @@ pub struct Withdraw<'info> {
     #[account(
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump = core_state.core_state_nonce,
+        constraint = core_state.active @ ErrorCode::NotActiveCoreState,
     )]
     pub core_state: Account<'info, CoreState>,
     #[account(
@@ -422,6 +448,7 @@ pub struct Bet<'info> {
         mut,
         seeds = [CORE_STATE_SEED.as_bytes(), core_state.admin.as_ref()],
         bump = core_state.core_state_nonce,
+        constraint = core_state.active @ ErrorCode::NotActiveCoreState,
     )]
     pub core_state: Box<Account<'info, CoreState>>,
     #[account(mut)]
@@ -462,6 +489,7 @@ pub struct BetReturn<'info> {
         mut,
         seeds = [CORE_STATE_SEED.as_bytes(), core_state.admin.as_ref()],
         bump = core_state.core_state_nonce,
+        constraint = core_state.active @ ErrorCode::NotActiveCoreState,
     )]
     pub core_state: Box<Account<'info, CoreState>>,
     /// CHECK:
@@ -508,6 +536,12 @@ pub struct InitializeArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct UpdateCoreStateArgs {
+    pub fee_percent: u8,
+    pub active: bool,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct RegisterArgs {
     pub vault_token_account_nonce: u8,
 }
@@ -542,6 +576,7 @@ pub struct CoreState {
     pub admin: Pubkey, // admin public key
     pub flip_counter: u64,
     pub fee_percent: u8,
+    pub active: bool,
 }
 
 #[account]
@@ -579,4 +614,6 @@ pub enum ErrorCode {
     InvalidCoreState,
     #[msg("Invalid TokenMint")]
     InvalidTokenMint,
+    #[msg("Not Active CoreState")]
+    NotActiveCoreState,
 }
