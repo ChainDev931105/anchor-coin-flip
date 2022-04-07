@@ -9,6 +9,7 @@ import {
   register,
   deposit,
   withdraw,
+  betDirectly,
   bet,
   betReturn,
   updateCoreState
@@ -186,9 +187,31 @@ describe('coin-flip', () => {
     }
   });
 
+  it('Bet Sol Directly', async () => {
+    for (let i = 0; i < 10; i++) {
+      const balanceBefore = await provider.connection.getBalance(user.publicKey);
+  
+      await betDirectly(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT, (i % 2) === 0);
+
+      const balanceAfter = await provider.connection.getBalance(user.publicKey);
+      console.log("try", i + 1, {balanceBefore, balanceAfter});
+    }
+  });
+
+  it('Bet Spl Directly', async () => {
+    for (let i = 0; i < 10; i++) {
+      const balanceBefore = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+
+      await betDirectly(admin.publicKey, user, tokenMint, BET_AMOUNT, (i % 2) === 0);
+
+      const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
+      console.log("try", i + 1, {balanceBefore, balanceAfter});
+    }
+  });
+
   it('Update CoreState', async () => {
     const NEW_FEE_PERCENT = 2;
-    const coreState = await updateCoreState(admin, NEW_FEE_PERCENT, false);
+    const coreState = await updateCoreState(admin, NEW_FEE_PERCENT, false, false);
 
     console.log("Core State: ", coreState.toBase58(), await program.account.coreState.fetch(coreState));
   });

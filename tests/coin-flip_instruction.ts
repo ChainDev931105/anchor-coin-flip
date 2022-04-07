@@ -135,6 +135,37 @@ export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: num
   return tx;
 }
 
+export async function betDirectly(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, betSide: boolean) {
+  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
+  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
+  
+  let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+    user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));
+  let vaultTokenAccount;
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
+  else {
+    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin);
+    vaultTokenAccount = _vaultTokenAccount;
+  }
+
+  await program.rpc.betDirectly({
+    amount: new anchor.BN(amount),
+    betSide,
+  }, {
+    accounts: {
+      coreState,
+      user: user.publicKey,
+      vaultAuthority,
+      tokenMint,
+      userTokenAccount,
+      vaultTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId
+    },
+    signers: [user]
+  });
+}
+
 export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, betSide: boolean) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
@@ -207,12 +238,13 @@ export async function betReturn(admin: Keypair, betState: PublicKey) {
   return betState;
 }
 
-export async function updateCoreState(admin: Keypair, feePercent: number, active: boolean) {
+export async function updateCoreState(admin: Keypair, feePercent: number, active: boolean, allowDirectBet: boolean) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
 
   await program.rpc.updateCoreState({
     feePercent,
-    active
+    active,
+    allowDirectBet
   }, {
     accounts: {
       admin: admin.publicKey,
