@@ -150,7 +150,7 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
   let flipCounter = parseInt((await program.account.coreState.fetch(coreState)).flipCounter);
-  let [betState, betStateNonce] = await getBetState(program.programId, admin, flipCounter);
+  let [betState, betStateNonce] = await getBetState(program.programId, admin, tokenMint);
   
   let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
     user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));
@@ -220,10 +220,9 @@ export async function betReturn(admin: Keypair, betState: PublicKey) {
 
 export async function updateCoreState(admin: Keypair, feePercent: number, active: boolean, allowDirectBet: boolean) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  feePercent = Math.floor(feePercent * 100);
 
   await program.rpc.updateCoreState({
-    feePercent: new anchor.BN(feePercent),
+    feePercent: new anchor.BN(feePercent * 100),
     active,
     allowDirectBet
   }, {

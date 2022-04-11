@@ -151,7 +151,7 @@ describe('coin-flip', () => {
       await betReturn(admin, betState);
 
       const balanceFinal = await provider.connection.getBalance(user.publicKey);
-      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal});
+      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, result: balanceBefore > balanceFinal ? "lose" : "win"});
     }
   });
 
@@ -184,7 +184,7 @@ describe('coin-flip', () => {
       await betReturn(admin, betState);
 
       const balanceFinal = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
-      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal});
+      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, result: balanceBefore > balanceFinal ? "lose" : "win"});
     }
   });
 
@@ -195,7 +195,7 @@ describe('coin-flip', () => {
       await betDirectly(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT, (i % 2) === 0);
 
       const balanceAfter = await provider.connection.getBalance(user.publicKey);
-      console.log("try", i + 1, {balanceBefore, balanceAfter});
+      console.log("try", i + 1, {balanceBefore, balanceAfter, result: balanceBefore > balanceAfter ? "lose" : "win"});
     }
   });
 
@@ -206,7 +206,7 @@ describe('coin-flip', () => {
       await betDirectly(admin.publicKey, user, tokenMint, BET_AMOUNT, (i % 2) === 0);
 
       const balanceAfter = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
-      console.log("try", i + 1, {balanceBefore, balanceAfter});
+      console.log("try", i + 1, {balanceBefore, balanceAfter, result: balanceBefore > balanceAfter ? "lose" : "win"});
     }
   });
 

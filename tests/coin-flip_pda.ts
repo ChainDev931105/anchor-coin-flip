@@ -41,12 +41,12 @@ export async function getVaultTokenAccount(programId: PublicKey, tokenMint: Publ
   );
 }
 
-export async function getBetState(programId: PublicKey, admin: PublicKey, flipCounter: number) {
+export async function getBetState(programId: PublicKey, admin: PublicKey, tokenMint: PublicKey) {
   return await anchor.web3.PublicKey.findProgramAddress(
     [
       Buffer.from(anchor.utils.bytes.utf8.encode(BET_STATE_SEED)),
       admin.toBuffer(),
-      (new anchor.BN(flipCounter)).toArrayLike(Buffer, "le", 8)
+      tokenMint.toBuffer()
     ],
     programId
   );

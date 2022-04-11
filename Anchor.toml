@@ -1,7 +1,7 @@
 [features]
 seeds = false
 [programs.localnet]
-coin_flip = "8pcnT9J7xgry2CBs5mJtrAeForcRSqJCJn1tTz5xknU2"
+coin_flip = "BTSbmBpqhxqanUsfNMoRhDqRxDEQz5G2P4QnoQjAnGDS"
 
 [registry]
 url = "https://anchor.projectserum.com"

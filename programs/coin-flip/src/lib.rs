@@ -12,7 +12,7 @@ use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer}
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-declare_id!("8pcnT9J7xgry2CBs5mJtrAeForcRSqJCJn1tTz5xknU2");
+declare_id!("BTSbmBpqhxqanUsfNMoRhDqRxDEQz5G2P4QnoQjAnGDS");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
@@ -638,7 +638,7 @@ pub struct Bet<'info> {
     #[account(
         init,
         space = 8 + 1 + 8 + 1 + 8 + 1 + 3 * std::mem::size_of::<Pubkey>(),
-        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), &args.flip_counter.to_le_bytes()],
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), token_mint.key().as_ref()],
         bump,
         payer = user,
     )]
@@ -682,7 +682,7 @@ pub struct BetReturn<'info> {
         constraint = bet_state.approved @ ErrorCode::UnapprovedBet,
         constraint = bet_state.core_state == core_state.key() @ ErrorCode::InvalidCoreState,
         constraint = bet_state.token_mint == token_mint.key() @ ErrorCode::InvalidTokenMint,
-        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), &bet_state.flip_counter.to_le_bytes()],
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), token_mint.key().as_ref()],
         bump = bet_state.bet_state_nonce,
     )]
     pub bet_state: Box<Account<'info, BetState>>,
