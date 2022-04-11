@@ -12,13 +12,14 @@ import {
 
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
 
-export async function initialize(admin: Keypair, feePercent: number) {
+export async function initialize(admin: Keypair, feePercent: number, winRatio: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
   await program.rpc.initialize({
     coreStateNonce,
     vaultAuthNonce,
-    feePercent
+    feePercent: new anchor.BN(feePercent * 100),
+    winRatio: new anchor.BN(winRatio * 100)
   }, {
     accounts: {
       admin: admin.publicKey,
@@ -29,27 +30,6 @@ export async function initialize(admin: Keypair, feePercent: number) {
     signers: [admin]
   });
   return { coreState, vaultAuthority };
-}
-
-export async function initializeTx(admin: PublicKey, feePercent: number) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
-  const tx = new Transaction();
-  tx.add(
-    program.instruction.initialize({
-      coreStateNonce,
-      vaultAuthNonce,
-      feePercent
-    }, {
-      accounts: {
-        admin: admin,
-        coreState,
-        vaultAuthority,
-        systemProgram: SystemProgram.programId
-      }
-    })
-  );
-  return tx;
 }
 
 export async function register(admin: Keypair, tokenMint: PublicKey) {
@@ -240,9 +220,10 @@ export async function betReturn(admin: Keypair, betState: PublicKey) {
 
 export async function updateCoreState(admin: Keypair, feePercent: number, active: boolean, allowDirectBet: boolean) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
+  feePercent = Math.floor(feePercent * 100);
 
   await program.rpc.updateCoreState({
-    feePercent,
+    feePercent: new anchor.BN(feePercent),
     active,
     allowDirectBet
   }, {

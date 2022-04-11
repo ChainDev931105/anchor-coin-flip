@@ -12,7 +12,7 @@ use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer}
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-declare_id!("6VBeyxBMAZaqRev8NUPPQhEbdeSRKAHjRrJXvEnaebSR");
+declare_id!("8pcnT9J7xgry2CBs5mJtrAeForcRSqJCJn1tTz5xknU2");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
@@ -31,6 +31,7 @@ pub mod coin_flip {
         ctx.accounts.core_state.vault_auth_nonce = args.vault_auth_nonce;
         ctx.accounts.core_state.flip_counter = 0;
         ctx.accounts.core_state.fee_percent = args.fee_percent;
+        ctx.accounts.core_state.win_ratio = args.win_ratio;
         ctx.accounts.core_state.active = true;
         ctx.accounts.core_state.allow_direct_bet = true;
         Ok(())
@@ -168,6 +169,7 @@ pub mod coin_flip {
         let system_program = &ctx.accounts.system_program;
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
+        let fee = args.amount * (core_state.fee_percent as u64) / 10000;
 
         if !is_native {
             utils::assert_is_ata(&user_token_account, &user.key(), &token_mint.key())?;
@@ -178,7 +180,7 @@ pub mod coin_flip {
                     &vault_token_account.key(),
                     &user.key(),
                     &[],
-                    args.amount,
+                    args.amount + fee,
                 )?,
                 &[
                     vault_token_account.to_account_info(),
@@ -194,7 +196,7 @@ pub mod coin_flip {
                 &anchor_lang::solana_program::system_instruction::transfer(
                     &user_token_account.key(),
                     &vault_token_account.key(),
-                    args.amount,
+                    args.amount + fee,
                 ),
                 &[
                     vault_token_account.to_account_info(),
@@ -203,12 +205,15 @@ pub mod coin_flip {
                 ],
             )?;
         }
+
         let clock = (Clock::get()?).unix_timestamp as u64;
         let hash = calc_hash(clock, core_state.flip_counter);
+        let hash_remain = hash % 10000;
 
-        let fee = args.amount * (core_state.fee_percent as u64) / 100;
+        let is_win = (args.bet_side && hash_remain < core_state.win_ratio as u64) || 
+            (!args.bet_side && hash_remain >= 10000 - core_state.win_ratio as u64);
 
-        if (hash % 2 == 0) ^ args.bet_side {
+        if is_win {
             let vault_auth_seeds = [
                 VAULT_AUTH_SEED.as_bytes(),
                 core_state.admin.as_ref(),
@@ -224,7 +229,7 @@ pub mod coin_flip {
                         &user_token_account.key(),
                         &vault_authority.key(),
                         &[],
-                        2 * args.amount - fee,
+                        2 * args.amount,
                     )?,
                     &[
                         vault_token_account.to_account_info(),
@@ -241,7 +246,7 @@ pub mod coin_flip {
                     &anchor_lang::solana_program::system_instruction::transfer(
                         &vault_token_account.key(),
                         &user_token_account.key(),
-                        2 * args.amount - fee,
+                        2 * args.amount,
                     ),
                     &[
                         vault_token_account.to_account_info(),
@@ -274,6 +279,7 @@ pub mod coin_flip {
         let system_program = &ctx.accounts.system_program;
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
+        let fee = args.amount * (core_state.fee_percent as u64) / 10000;
 
         if !is_native {
             utils::assert_is_ata(&user_token_account, &user.key(), &token_mint.key())?;
@@ -284,7 +290,7 @@ pub mod coin_flip {
                     &vault_token_account.key(),
                     &user.key(),
                     &[],
-                    args.amount,
+                    args.amount + fee,
                 )?,
                 &[
                     vault_token_account.to_account_info(),
@@ -300,7 +306,7 @@ pub mod coin_flip {
                 &anchor_lang::solana_program::system_instruction::transfer(
                     &user_token_account.key(),
                     &vault_token_account.key(),
-                    args.amount,
+                    args.amount + fee,
                 ),
                 &[
                     vault_token_account.to_account_info(),
@@ -328,7 +334,6 @@ pub mod coin_flip {
         let admin = &ctx.accounts.admin;
         let core_state = &ctx.accounts.core_state;
         let bet_state = &ctx.accounts.bet_state;
-        let fee = bet_state.amount * (core_state.fee_percent as u64) / 100;
         let user = &ctx.accounts.user;
         let vault_authority = &ctx.accounts.vault_authority;
         let token_mint = &ctx.accounts.token_mint;
@@ -338,11 +343,15 @@ pub mod coin_flip {
         let system_program = &ctx.accounts.system_program;
         
         let is_native = token_mint.key() == spl_token::native_mint::id();
-
+        
         let clock = (Clock::get()?).unix_timestamp as u64;
         let hash = calc_hash(clock, core_state.flip_counter);
+        let hash_remain = hash % 10000;
 
-        if (hash % 2 == 0) ^ bet_state.bet_side {
+        let is_win = (bet_state.bet_side && hash_remain < core_state.win_ratio as u64) || 
+            (!bet_state.bet_side && hash_remain >= 10000 - core_state.win_ratio as u64);
+
+        if is_win {
             let vault_auth_seeds = [
                 VAULT_AUTH_SEED.as_bytes(),
                 core_state.admin.as_ref(),
@@ -358,7 +367,7 @@ pub mod coin_flip {
                         &user_token_account.key(),
                         &vault_authority.key(),
                         &[],
-                        2 * bet_state.amount - fee,
+                        2 * bet_state.amount,
                     )?,
                     &[
                         vault_token_account.to_account_info(),
@@ -375,7 +384,7 @@ pub mod coin_flip {
                     &anchor_lang::solana_program::system_instruction::transfer(
                         &vault_token_account.key(),
                         &user_token_account.key(),
-                        2 * bet_state.amount - fee,
+                        2 * bet_state.amount,
                     ),
                     &[
                         vault_token_account.to_account_info(),
@@ -436,7 +445,7 @@ pub struct Initialize<'info> {
     pub admin: Signer<'info>,
     #[account(
         init,
-        space = 8 + 1 + 1 + 8 + 1 + 1 + 1 + std::mem::size_of::<Pubkey>(),
+        space = 8 + 1 + 1 + 8 + 2 + 2 + 1 + 1 + std::mem::size_of::<Pubkey>(),
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump,
         payer = admin,
@@ -691,14 +700,15 @@ pub struct BetReturn<'info> {
 pub struct InitializeArgs {
     pub core_state_nonce: u8,
     pub vault_auth_nonce: u8,
-    pub fee_percent: u8,
+    pub fee_percent: u16,
+    pub win_ratio: u16, // 4500 => 45%
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct UpdateCoreStateArgs {
-    pub fee_percent: u8,
     pub active: bool,
     pub allow_direct_bet: bool,
+    pub fee_percent: u16,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -741,7 +751,8 @@ pub struct CoreState {
     pub vault_auth_nonce: u8,
     pub admin: Pubkey, // admin public key
     pub flip_counter: u64,
-    pub fee_percent: u8,
+    pub fee_percent: u16, // 500 => 5 %
+    pub win_ratio: u16, // 4500 => 45%
     pub active: bool,
     pub allow_direct_bet: bool,
 }

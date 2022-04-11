@@ -27,11 +27,12 @@ describe('coin-flip', () => {
   const admin = Keypair.generate();
   const user = Keypair.generate();
   const tokenMintAuthority = Keypair.generate();
-  const AIRDROP_AMOUNT = 1_000_000_000;
-  const DEPOSIT_AMOUNT = 100_000_000;
-  const WITHDRAW_AMOUNT = 50_000_000;
+  const AIRDROP_AMOUNT = 5_000_000_000;
+  const DEPOSIT_AMOUNT = 500_000_000;
+  const WITHDRAW_AMOUNT = 250_000_000;
   const BET_AMOUNT = 5_000_000;
-  const FEE_PERCENT = 1;
+  const FEE_PERCENT = 5;
+  const WIN_RATIO = 45;
   let vaultAuth;
   let tokenMint;
   let adminTokenAccount;
@@ -50,7 +51,7 @@ describe('coin-flip', () => {
     );
 
     // initialize
-    const { coreState, vaultAuthority } = await initialize(admin, FEE_PERCENT);
+    const { coreState, vaultAuthority } = await initialize(admin, FEE_PERCENT, WIN_RATIO);
     coreStateAddress = coreState;
     vaultAuth = vaultAuthority;
     console.log("Core State: ", coreState.toBase58(), await program.account.coreState.fetch(coreStateAddress));
@@ -150,7 +151,7 @@ describe('coin-flip', () => {
       await betReturn(admin, betState);
 
       const balanceFinal = await provider.connection.getBalance(user.publicKey);
-      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, betStateFetch});
+      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal});
     }
   });
 
@@ -183,7 +184,7 @@ describe('coin-flip', () => {
       await betReturn(admin, betState);
 
       const balanceFinal = parseInt((await provider.connection.getTokenAccountBalance(userTokenAccount)).value.amount);
-      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, betStateFetch});
+      console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal});
     }
   });
 
