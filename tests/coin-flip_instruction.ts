@@ -12,7 +12,7 @@ import {
 
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
 
-export async function initialize(admin: Keypair, feePercent: number, winRatio: number) {
+export async function initialize(admin: Keypair, executer: Keypair, feePercent: number, winRatio: number) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
   await program.rpc.initialize({
@@ -23,6 +23,7 @@ export async function initialize(admin: Keypair, feePercent: number, winRatio: n
   }, {
     accounts: {
       admin: admin.publicKey,
+      executer: executer.publicKey,
       coreState,
       vaultAuthority,
       systemProgram: SystemProgram.programId
@@ -184,7 +185,7 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
   return betState;
 }
 
-export async function betReturn(admin: Keypair, betState: PublicKey) {
+export async function betReturn(admin: Keypair, executer: Keypair, betState: PublicKey) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let { betStateNonce, user, flipCounter, tokenMint } = (await program.account.betState.fetch(betState));
 
@@ -202,6 +203,7 @@ export async function betReturn(admin: Keypair, betState: PublicKey) {
   await program.rpc.betReturn({
     accounts: {
       admin: admin.publicKey,
+      executer: executer.publicKey,
       coreState,
       user,
       vaultAuthority,
@@ -213,7 +215,7 @@ export async function betReturn(admin: Keypair, betState: PublicKey) {
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY
     },
-    signers: [admin]
+    signers: [executer]
   });
   return betState;
 }

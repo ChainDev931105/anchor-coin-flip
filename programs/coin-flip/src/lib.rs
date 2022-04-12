@@ -27,6 +27,7 @@ pub mod coin_flip {
 
     pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
         ctx.accounts.core_state.admin = ctx.accounts.admin.key();
+        ctx.accounts.core_state.executer = ctx.accounts.executer.key();
         ctx.accounts.core_state.core_state_nonce = args.core_state_nonce;
         ctx.accounts.core_state.vault_auth_nonce = args.vault_auth_nonce;
         ctx.accounts.core_state.flip_counter = 0;
@@ -332,6 +333,7 @@ pub mod coin_flip {
         ctx.accounts.bet_state.approved = false;
 
         let admin = &ctx.accounts.admin;
+        let executer = &ctx.accounts.executer;
         let core_state = &ctx.accounts.core_state;
         let bet_state = &ctx.accounts.bet_state;
         let user = &ctx.accounts.user;
@@ -341,7 +343,8 @@ pub mod coin_flip {
         let vault_token_account = &ctx.accounts.vault_token_account;
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
-        
+
+
         let is_native = token_mint.key() == spl_token::native_mint::id();
         
         let clock = (Clock::get()?).unix_timestamp as u64;
@@ -441,11 +444,14 @@ pub fn calc_hash(clock: u64, flip_counter: u64) -> u64 {
 #[derive(Accounts)]
 #[instruction(args: InitializeArgs)]
 pub struct Initialize<'info> {
+    /// CHECK:
+    #[account()]
+    pub executer: AccountInfo<'info>,
     #[account(mut)]
     pub admin: Signer<'info>,
     #[account(
         init,
-        space = 8 + 1 + 1 + 8 + 2 + 2 + 1 + 1 + std::mem::size_of::<Pubkey>(),
+        space = 8 + 1 + 1 + 8 + 2 + 2 + 1 + 1 + std::mem::size_of::<Pubkey>() + std::mem::size_of::<Pubkey>(),
         seeds = [CORE_STATE_SEED.as_bytes(), admin.key().as_ref()],
         bump,
         payer = admin,
@@ -651,8 +657,10 @@ pub struct Bet<'info> {
 
 #[derive(Accounts)]
 pub struct BetReturn<'info> {
+    pub executer: Signer<'info>,
+    /// CHECK:
     #[account(mut)]
-    pub admin: Signer<'info>,
+    pub admin: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [CORE_STATE_SEED.as_bytes(), core_state.admin.as_ref()],
@@ -750,6 +758,7 @@ pub struct CoreState {
     pub core_state_nonce: u8,
     pub vault_auth_nonce: u8,
     pub admin: Pubkey, // admin public key
+    pub executer: Pubkey, // executer public key
     pub flip_counter: u64,
     pub fee_percent: u16, // 500 => 5 %
     pub win_ratio: u16, // 4500 => 45%
