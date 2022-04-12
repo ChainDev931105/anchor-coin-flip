@@ -27,6 +27,7 @@ describe('coin-flip', () => {
   const admin = Keypair.generate();
   const user = Keypair.generate();
   const executer = Keypair.generate();
+  const false_executer = Keypair.generate();
   const tokenMintAuthority = Keypair.generate();
   const AIRDROP_AMOUNT = 5_000_000_000;
   const DEPOSIT_AMOUNT = 500_000_000;
@@ -54,6 +55,14 @@ describe('coin-flip', () => {
     await program.provider.connection.confirmTransaction(
         await program.provider.connection.requestAirdrop(
             executer.publicKey,
+            AIRDROP_AMOUNT
+        ),
+        "confirmed"
+    );
+
+    await program.provider.connection.confirmTransaction(
+        await program.provider.connection.requestAirdrop(
+            false_executer.publicKey,
             AIRDROP_AMOUNT
         ),
         "confirmed"
@@ -139,6 +148,30 @@ describe('coin-flip', () => {
     expect(balanceBefore - balanceAfter).to.equal(WITHDRAW_AMOUNT);
   });
 
+  it('Fail bet Sol', async () => {
+    // airdrop to user account
+    await program.provider.connection.confirmTransaction(
+        await program.provider.connection.requestAirdrop(
+            user.publicKey,
+            AIRDROP_AMOUNT
+        ),
+        "confirmed"
+    );
+
+    const balanceBefore = await provider.connection.getBalance(user.publicKey);
+
+    let betState = await bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT, true);
+    let betStateFetch = (await program.account.betState.fetch(betState));
+
+    const balanceAfter = await provider.connection.getBalance(user.publicKey);
+
+    await betReturn(admin, false_executer, betState);
+
+    const balanceFinal = await provider.connection.getBalance(user.publicKey);
+    console.log("Should fail", {balanceBefore, balanceAfter, balanceFinal, result: balanceBefore > balanceFinal ? "lose" : "win"});
+  });
+
+
   it('Bet Sol', async () => {
     // airdrop to user account
     await program.provider.connection.confirmTransaction(
@@ -163,6 +196,7 @@ describe('coin-flip', () => {
       console.log("try", i + 1, {balanceBefore, balanceAfter, balanceFinal, result: balanceBefore > balanceFinal ? "lose" : "win"});
     }
   });
+
 
   it('Bet Spl', async () => {
     // create user token account

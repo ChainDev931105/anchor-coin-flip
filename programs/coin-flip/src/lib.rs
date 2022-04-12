@@ -344,6 +344,7 @@ pub mod coin_flip {
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
 
+        utils::assert_keys_equal(executer.key(), core_state.executer.key());
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
         
