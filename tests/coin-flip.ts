@@ -4,6 +4,9 @@ import { CoinFlip } from '../target/types/coin_flip';
 import { Keypair, SystemProgram } from '@solana/web3.js';
 import { createAssociatedTokenAccount, createMint, getAssociatedTokenAddress, getOrCreateAssociatedTokenAccount, mintTo, NATIVE_MINT, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { expect } from "chai";
+import * as assert from 'assert';
+import * as chai from 'chai';
+import chaiAsPromised from 'chai-as-promised';
 import {
   initialize,
   register,
@@ -17,6 +20,8 @@ import {
 import {
   getVaultTokenAccount
 } from './coin-flip_pda';
+
+chai.use(chaiAsPromised);
 
 describe('coin-flip', () => {
   const provider = anchor.Provider.env();
@@ -161,11 +166,11 @@ describe('coin-flip', () => {
     const balanceBefore = await provider.connection.getBalance(user.publicKey);
 
     let betState = await bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT, true);
-    let betStateFetch = (await program.account.betState.fetch(betState));
 
     const balanceAfter = await provider.connection.getBalance(user.publicKey);
 
-    await betReturn(admin, false_executer, betState);
+
+    await expect(betReturn(admin, false_executer, betState)).to.be.rejectedWith("Wrong Executer");
 
     const balanceFinal = await provider.connection.getBalance(user.publicKey);
     console.log("Should fail", {balanceBefore, balanceAfter, balanceFinal, result: balanceBefore > balanceFinal ? "lose" : "win"});
