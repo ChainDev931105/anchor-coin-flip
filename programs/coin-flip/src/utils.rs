@@ -12,6 +12,17 @@ use anchor_spl::token::{Mint, Token, TokenAccount};
 use spl_token::{instruction::initialize_account2, state::Account as SplAccount};
 use crate::{ErrorCode};
 
+pub fn assert_allowed_amount(
+    allowed_amounts: &Vec<u64>,
+    amount: u64
+) -> Result<()> {
+    if allowed_amounts.contains(&amount) {
+        Ok(())
+    } else {
+        Err(ErrorCode::AmountNotAllowed.into())
+    }
+}
+
 pub fn assert_is_ata(
     ata: &AccountInfo,
     wallet: &Pubkey,

@@ -41,6 +41,7 @@ describe('coin-flip', () => {
   let vaultTokenAccount;
   let userTokenAccount;
   let coreStateAddress;
+  const amounts = [1, 5_000_000 , 3, 4, 5];
 
   it('Is initialized!', async () => {
     // airdrop to admin account
@@ -85,6 +86,10 @@ describe('coin-flip', () => {
     expect(balanceAfter - balanceBefore).to.equal(DEPOSIT_AMOUNT);
   });
 
+  it('Register SOL', async () => {
+    await register(admin, NATIVE_MINT, amounts);
+  });
+
   it('Register Spl', async () => {
     // mint a new token
     tokenMint = await createMint(
@@ -95,7 +100,7 @@ describe('coin-flip', () => {
       9
     );
 
-    await register(admin, tokenMint);
+    await register(admin, tokenMint, amounts);
   });
 
   it('Deposit Spl', async () => {

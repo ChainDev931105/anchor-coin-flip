@@ -14,6 +14,7 @@ use std::collections::hash_map::DefaultHasher;
 
 declare_id!("FNEAGNqHuUWzfY4njXBNHi7ABVT2XiLqW9HsS1JXV5uN");
 
+pub const ALLOWED: &str = "allowed";
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
 pub const VAULT_TOKEN_ACCOUNT_SEED: &str = "vault-token-account";
@@ -45,7 +46,8 @@ pub mod coin_flip {
         Ok(())
     }
 
-    pub fn register(_ctx: Context<Register>, _args: RegisterArgs) -> Result<()> {
+    pub fn register(ctx: Context<Register>, args: RegisterArgs) -> Result<()> {
+        ctx.accounts.allowed_bets.amounts = args.amounts;
         Ok(())
     }
 
@@ -168,7 +170,9 @@ pub mod coin_flip {
         let vault_token_account = &ctx.accounts.vault_token_account;
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
+        let allowed_amounts = &ctx.accounts.allowed_bets.amounts;
 
+        utils::assert_allowed_amount(allowed_amounts, args.amount)?;
         let is_native = token_mint.key() == spl_token::native_mint::id();
         let fee = args.amount * (core_state.fee_percent as u64) / 10000;
 
@@ -513,6 +517,14 @@ pub struct Register<'info> {
         payer = admin,
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
+    #[account(
+        init,
+        payer = admin,
+        space = 100,
+        seeds = [ALLOWED.as_bytes(), token_mint.key().as_ref(), core_state.admin.key().as_ref()],
+        bump
+    )]
+    pub allowed_bets: Account<'info, AllowedBets>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub rent: Sysvar<'info, Rent>,
@@ -611,7 +623,11 @@ pub struct BetDirectly<'info> {
     /// CHECK:
     #[account(mut)]
     pub vault_token_account: UncheckedAccount<'info>,
-
+    #[account(
+        seeds = [ALLOWED.as_bytes(), token_mint.key().as_ref(), core_state.admin.key().as_ref()],
+        bump
+    )]
+    pub allowed_bets: Account<'info, AllowedBets>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -650,7 +666,11 @@ pub struct Bet<'info> {
         payer = user,
     )]
     pub bet_state: Box<Account<'info, BetState>>,
-
+    #[account(
+        seeds = [ALLOWED.as_bytes(), token_mint.key().as_ref(), core_state.admin.key().as_ref()],
+        bump
+    )]
+    pub allowed_bets: Account<'info, AllowedBets>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -723,6 +743,7 @@ pub struct UpdateCoreStateArgs {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct RegisterArgs {
     pub vault_token_account_nonce: u8,
+    pub amounts: Vec<u64>
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -739,6 +760,7 @@ pub struct WithdrawArgs {
 pub struct BetDirectlyArgs {
     pub amount: u64,
     pub bet_side: bool, // true = Head, false = Tail
+    pub allowed_amounts_nonce: u8
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -747,6 +769,7 @@ pub struct BetArgs {
     pub bet_side: bool, // true = Head, false = Tail
     pub flip_counter: u64,
     pub bet_state_nonce: u8,
+    pub allowed_nonce: u8
 }
 
 // -------------------------------------------------------------------------------- //
@@ -780,6 +803,13 @@ pub struct BetState {
     pub approved: bool, // originally false. set true after transfer
 }
 
+#[account]
+#[derive(Default)]
+pub struct AllowedBets {
+    pub nonce: u8,
+    pub amounts: Vec<u64>
+}
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("Wrong Admin Address")]
@@ -808,4 +838,6 @@ pub enum ErrorCode {
     NumericalOverflow,
     #[msg("DirectBet is not allowed")]
     DirectBetNotAllowed,
+    #[msg("Amount not allowed")]
+    AmountNotAllowed
 }
