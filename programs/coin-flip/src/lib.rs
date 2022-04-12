@@ -657,6 +657,9 @@ pub struct Bet<'info> {
 
 #[derive(Accounts)]
 pub struct BetReturn<'info> {
+    #[account(
+        constraint = core_state.executer == executer.key() @ ErrorCode::WrongExecuter,
+    )]
     pub executer: Signer<'info>,
     /// CHECK:
     #[account(mut)]
@@ -807,4 +810,6 @@ pub enum ErrorCode {
     NumericalOverflow,
     #[msg("DirectBet is not allowed")]
     DirectBetNotAllowed,
+    #[msg("Wrong Executer")]
+    WrongExecuter,
 }
