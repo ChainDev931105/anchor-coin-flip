@@ -352,7 +352,7 @@ pub mod coin_flip {
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
 
-        utils::assert_keys_equal(executer.key(), core_state.executer.key());
+        utils::assert_keys_equal(executer.key(), core_state.executer.key())?;
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
         
@@ -665,7 +665,7 @@ pub struct Bet<'info> {
     #[account(
         init,
         space = 8 + 1 + 8 + 1 + 8 + 1 + 3 * std::mem::size_of::<Pubkey>(),
-        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), user.key().as_ref()],
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), user.key().as_ref(), &core_state.flip_counter.to_le_bytes()],
         bump,
         payer = user,
     )]
@@ -682,6 +682,9 @@ pub struct Bet<'info> {
 
 #[derive(Accounts)]
 pub struct BetReturn<'info> {
+    #[account(
+        constraint = core_state.executer == executer.key() @ ErrorCode::WrongExecuter,
+    )]
     pub executer: Signer<'info>,
     /// CHECK:
     #[account(mut)]
@@ -715,7 +718,7 @@ pub struct BetReturn<'info> {
         constraint = bet_state.approved @ ErrorCode::UnapprovedBet,
         constraint = bet_state.core_state == core_state.key() @ ErrorCode::InvalidCoreState,
         constraint = bet_state.token_mint == token_mint.key() @ ErrorCode::InvalidTokenMint,
-        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), user.key().as_ref()],
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), user.key().as_ref(), &bet_state.flip_counter.to_le_bytes()],
         bump = bet_state.bet_state_nonce,
     )]
     pub bet_state: Box<Account<'info, BetState>>,
@@ -844,4 +847,6 @@ pub enum ErrorCode {
     DirectBetNotAllowed,
     #[msg("Amount not allowed")]
     AmountNotAllowed
+    #[msg("Wrong Executer")]
+    WrongExecuter,
 }
