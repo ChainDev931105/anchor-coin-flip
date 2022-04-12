@@ -150,7 +150,7 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
   let flipCounter = parseInt((await program.account.coreState.fetch(coreState)).flipCounter);
-  let [betState, betStateNonce] = await getBetState(program.programId, admin, tokenMint);
+  let [betState, betStateNonce] = await getBetState(program.programId, admin, user.publicKey);
   
   let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
     user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));

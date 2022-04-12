@@ -638,7 +638,7 @@ pub struct Bet<'info> {
     #[account(
         init,
         space = 8 + 1 + 8 + 1 + 8 + 1 + 3 * std::mem::size_of::<Pubkey>(),
-        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), token_mint.key().as_ref()],
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), user.key().as_ref()],
         bump,
         payer = user,
     )]
@@ -682,7 +682,7 @@ pub struct BetReturn<'info> {
         constraint = bet_state.approved @ ErrorCode::UnapprovedBet,
         constraint = bet_state.core_state == core_state.key() @ ErrorCode::InvalidCoreState,
         constraint = bet_state.token_mint == token_mint.key() @ ErrorCode::InvalidTokenMint,
-        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), token_mint.key().as_ref()],
+        seeds = [BET_STATE_SEED.as_bytes(), core_state.admin.as_ref(), user.key().as_ref()],
         bump = bet_state.bet_state_nonce,
     )]
     pub bet_state: Box<Account<'info, BetState>>,
