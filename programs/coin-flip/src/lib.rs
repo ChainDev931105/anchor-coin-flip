@@ -846,7 +846,7 @@ pub enum ErrorCode {
     #[msg("DirectBet is not allowed")]
     DirectBetNotAllowed,
     #[msg("Amount not allowed")]
-    AmountNotAllowed
+    AmountNotAllowed,
     #[msg("Wrong Executer")]
-    WrongExecuter,
+    WrongExecuter
 }

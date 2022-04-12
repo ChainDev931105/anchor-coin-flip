@@ -218,17 +218,20 @@ describe('coin-flip', () => {
         "confirmed"
     );
 
-      const balanceBefore = await provider.connection.getBalance(user.publicKey);
+    await expect(bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT + 1, (BET_AMOUNT % 2) === 0)).to.be.rejectedWith("Amount not allowed");
+  });
 
-      let betState = await bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT + 1, (BET_AMOUNT % 2) === 0);
-      let betStateFetch = (await program.account.betState.fetch(betState));
+  it('Failed BetDirectly Sol', async () => {
+    // airdrop to user account
+    await program.provider.connection.confirmTransaction(
+        await program.provider.connection.requestAirdrop(
+            user.publicKey,
+            AIRDROP_AMOUNT
+        ),
+        "confirmed"
+    );
 
-      const balanceAfter = await provider.connection.getBalance(user.publicKey);
-
-      await betReturn(admin, executer, betState);
-
-      const balanceFinal = await provider.connection.getBalance(user.publicKey);
-      console.log("Failed Bet Sol:", {balanceBefore, balanceAfter, balanceFinal, result: balanceBefore > balanceFinal ? "lose" : "win"});
+    await expect(betDirectly(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT + 1, (BET_AMOUNT % 2) === 0)).to.be.rejectedWith("Amount not allowed");
   });
 
 
