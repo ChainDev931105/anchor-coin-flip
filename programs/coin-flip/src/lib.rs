@@ -283,6 +283,10 @@ pub mod coin_flip {
         let token_program = &ctx.accounts.token_program;
         let system_program = &ctx.accounts.system_program;
 
+        let allowed_amounts = &ctx.accounts.allowed_bets.amounts;
+
+        utils::assert_allowed_amount(allowed_amounts, args.amount)?;
+
         let is_native = token_mint.key() == spl_token::native_mint::id();
         let fee = args.amount * (core_state.fee_percent as u64) / 10000;
 
@@ -842,7 +846,7 @@ pub enum ErrorCode {
     #[msg("DirectBet is not allowed")]
     DirectBetNotAllowed,
     #[msg("Amount not allowed")]
-    AmountNotAllowed
+    AmountNotAllowed,
     #[msg("Wrong Executer")]
-    WrongExecuter,
+    WrongExecuter
 }

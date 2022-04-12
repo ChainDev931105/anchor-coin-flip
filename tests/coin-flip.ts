@@ -208,6 +208,33 @@ describe('coin-flip', () => {
   });
 
 
+  it('Failed Bet Sol', async () => {
+    // airdrop to user account
+    await program.provider.connection.confirmTransaction(
+        await program.provider.connection.requestAirdrop(
+            user.publicKey,
+            AIRDROP_AMOUNT
+        ),
+        "confirmed"
+    );
+
+    await expect(bet(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT + 1, (BET_AMOUNT % 2) === 0)).to.be.rejectedWith("Amount not allowed");
+  });
+
+  it('Failed BetDirectly Sol', async () => {
+    // airdrop to user account
+    await program.provider.connection.confirmTransaction(
+        await program.provider.connection.requestAirdrop(
+            user.publicKey,
+            AIRDROP_AMOUNT
+        ),
+        "confirmed"
+    );
+
+    await expect(betDirectly(admin.publicKey, user, NATIVE_MINT, BET_AMOUNT + 1, (BET_AMOUNT % 2) === 0)).to.be.rejectedWith("Amount not allowed");
+  });
+
+
   it('Bet Spl', async () => {
     // create user token account
     userTokenAccount = await createAssociatedTokenAccount(
