@@ -12,7 +12,7 @@ use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer}
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
 
-declare_id!("BTSbmBpqhxqanUsfNMoRhDqRxDEQz5G2P4QnoQjAnGDS");
+declare_id!("FNEAGNqHuUWzfY4njXBNHi7ABVT2XiLqW9HsS1JXV5uN");
 
 pub const CORE_STATE_SEED: &str = "core-state";
 pub const VAULT_AUTH_SEED: &str = "vault-auth";
