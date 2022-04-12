@@ -3,6 +3,7 @@ import { Program } from '@project-serum/anchor';
 import { PublicKey } from "@solana/web3.js";
 import { CoinFlip } from '../target/types/coin_flip';
 
+const ALLOWED: string = "allowed";
 const CORE_STATE_SEED: string = "core-state";
 const VAULT_AUTH_SEED: string = "vault-auth";
 const VAULT_TOKEN_ACCOUNT_SEED: string = "vault-token-account";
@@ -18,6 +19,17 @@ export async function getCoreState(programId: PublicKey, admin: PublicKey) {
     ],
     programId
   );
+}
+
+export async function getAllowed(programId: PublicKey, mint: PublicKey, admin: PublicKey) {
+    return await anchor.web3.PublicKey.findProgramAddress(
+        [
+            Buffer.from(anchor.utils.bytes.utf8.encode(ALLOWED)),
+            mint.toBuffer(),
+            admin.toBuffer()
+        ],
+        programId
+    );
 }
 
 export async function getVaultAuth(programId: PublicKey, admin: PublicKey) {

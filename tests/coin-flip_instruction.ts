@@ -7,7 +7,7 @@ import {
   getCoreState,
   getVaultAuth,
   getVaultTokenAccount,
-  getBetState
+  getBetState, getAllowed
 } from './coin-flip_pda';
 
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
@@ -33,14 +33,18 @@ export async function initialize(admin: Keypair, executer: Keypair, feePercent: 
   return { coreState, vaultAuthority };
 }
 
-export async function register(admin: Keypair, tokenMint: PublicKey) {
+export async function register(admin: Keypair, tokenMint: PublicKey, amounts: number[]) {
   let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
   let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
   let [vaultTokenAccount, vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+  let [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin.publicKey);
   await program.rpc.register({
-    vaultTokenAccountNonce
+    vaultTokenAccountNonce,
+    amounts: amounts.map(i => new anchor.BN(i))
   }, {
     accounts: {
+      allowedBets:
+      allowed,
       coreState,
       admin: admin.publicKey,
       tokenMint,
@@ -129,12 +133,15 @@ export async function betDirectly(admin: PublicKey, user: Keypair, tokenMint: Pu
     vaultTokenAccount = _vaultTokenAccount;
   }
 
+  let [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin);
   await program.rpc.betDirectly({
     amount: new anchor.BN(amount),
     betSide,
+    allowedAmountsNonce: allowedNonce
   }, {
     accounts: {
       coreState,
+      allowedBets: allowed,
       user: user.publicKey,
       vaultAuthority,
       tokenMint,
@@ -161,15 +168,18 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
     let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin);
     vaultTokenAccount = _vaultTokenAccount;
   }
+  let [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin);
 
   await program.rpc.bet({
     amount: new anchor.BN(amount),
     betSide,
     flipCounter: new anchor.BN(flipCounter),
-    betStateNonce
+    betStateNonce,
+    allowedNonce
   }, {
     accounts: {
       coreState,
+      allowedBets: allowed,
       user: user.publicKey,
       vaultAuthority,
       tokenMint,
