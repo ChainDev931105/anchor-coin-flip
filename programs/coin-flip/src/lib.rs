@@ -48,6 +48,7 @@ pub mod coin_flip {
 
     pub fn register(ctx: Context<Register>, args: RegisterArgs) -> Result<()> {
         ctx.accounts.allowed_bets.amounts = args.amounts;
+        ctx.accounts.allowed_bets.token_mint = ctx.accounts.token_mint.key();
         Ok(())
     }
 
@@ -173,6 +174,8 @@ pub mod coin_flip {
         let allowed_amounts = &ctx.accounts.allowed_bets.amounts;
 
         utils::assert_allowed_amount(allowed_amounts, args.amount)?;
+        utils::assert_keys_equal(ctx.accounts.allowed_bets.token_mint.key(), token_mint.key())?;
+
         let is_native = token_mint.key() == spl_token::native_mint::id();
         let fee = args.amount * (core_state.fee_percent as u64) / 10000;
 
@@ -286,6 +289,7 @@ pub mod coin_flip {
         let allowed_amounts = &ctx.accounts.allowed_bets.amounts;
 
         utils::assert_allowed_amount(allowed_amounts, args.amount)?;
+        utils::assert_keys_equal(ctx.accounts.allowed_bets.token_mint.key(), token_mint.key())?;
 
         let is_native = token_mint.key() == spl_token::native_mint::id();
         let fee = args.amount * (core_state.fee_percent as u64) / 10000;
@@ -814,6 +818,7 @@ pub struct BetState {
 #[derive(Default)]
 pub struct AllowedBets {
     pub nonce: u8,
+    pub token_mint: Pubkey,
     pub amounts: Vec<u64>
 }
 

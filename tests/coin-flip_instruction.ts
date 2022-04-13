@@ -13,8 +13,8 @@ import {
 const program = anchor.workspace.CoinFlip as Program<CoinFlip>;
 
 export async function initialize(admin: Keypair, executer: Keypair, feePercent: number, winRatio: number) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  const [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
+  const [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
   await program.rpc.initialize({
     coreStateNonce,
     vaultAuthNonce,
@@ -34,10 +34,10 @@ export async function initialize(admin: Keypair, executer: Keypair, feePercent: 
 }
 
 export async function register(admin: Keypair, tokenMint: PublicKey, amounts: number[]) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
-  let [vaultTokenAccount, vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
-  let [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin.publicKey);
+  const [coreState] = await getCoreState(program.programId, admin.publicKey);
+  const [vaultAuthority] = await getVaultAuth(program.programId, admin.publicKey);
+  const [vaultTokenAccount, vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+  const [allowed] = await getAllowed(program.programId, tokenMint, admin.publicKey);
   await program.rpc.register({
     vaultTokenAccountNonce,
     amounts: amounts.map(i => new anchor.BN(i))
@@ -59,19 +59,20 @@ export async function register(admin: Keypair, tokenMint: PublicKey, amounts: nu
 }
 
 export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: number) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  const [coreState] = await getCoreState(program.programId, admin.publicKey);
+  const [vaultAuthority] = await getVaultAuth(program.programId, admin.publicKey);
   
-  let adminTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+  const adminTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ?
     admin.publicKey : (await getAssociatedTokenAddress(tokenMint, admin.publicKey));
   let vaultTokenAccount;
-  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
-  else {
-    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) {
+    vaultTokenAccount = vaultAuthority;
+  } else {
+    const [_vaultTokenAccount] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
     vaultTokenAccount = _vaultTokenAccount;
   }
     
-  let tx = await program.rpc.deposit({
+  await program.rpc.deposit({
     amount: new anchor.BN(amount)
   }, {
     accounts: {
@@ -86,23 +87,23 @@ export async function deposit(admin: Keypair, tokenMint: PublicKey, amount: numb
     },
     signers: [admin]
   });
-  return tx;
 }
 
 export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: number) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  const [coreState] = await getCoreState(program.programId, admin.publicKey);
+  const [vaultAuthority] = await getVaultAuth(program.programId, admin.publicKey);
   
-  let adminTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+  const adminTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ?
     admin.publicKey : (await getAssociatedTokenAddress(tokenMint, admin.publicKey));
   let vaultTokenAccount;
-  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
-  else {
-    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) {
+    vaultTokenAccount = vaultAuthority;
+  } else {
+    let [_vaultTokenAccount] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
     vaultTokenAccount = _vaultTokenAccount;
   }
   
-  let tx = await program.rpc.withdraw({
+  await program.rpc.withdraw({
     amount: new anchor.BN(amount)
   }, {
     accounts: {
@@ -117,23 +118,23 @@ export async function withdraw(admin: Keypair, tokenMint: PublicKey, amount: num
     },
     signers: [admin]
   });
-  return tx;
 }
 
 export async function betDirectly(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, betSide: boolean) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
+  const [coreState] = await getCoreState(program.programId, admin);
+  const [vaultAuthority] = await getVaultAuth(program.programId, admin);
   
-  let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+  const userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ?
     user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));
   let vaultTokenAccount;
-  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
-  else {
-    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin);
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) {
+    vaultTokenAccount = vaultAuthority;
+  } else {
+    let [_vaultTokenAccount] = await getVaultTokenAccount(program.programId, tokenMint, admin);
     vaultTokenAccount = _vaultTokenAccount;
   }
 
-  let [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin);
+  const [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin);
   await program.rpc.betDirectly({
     amount: new anchor.BN(amount),
     betSide,
@@ -155,20 +156,21 @@ export async function betDirectly(admin: PublicKey, user: Keypair, tokenMint: Pu
 }
 
 export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey, amount: number, betSide: boolean) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin);
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin);
-  let flipCounter = parseInt((await program.account.coreState.fetch(coreState)).flipCounter);
-  let [betState, betStateNonce] = await getBetState(program.programId, admin, user.publicKey, flipCounter);
+  const [coreState] = await getCoreState(program.programId, admin);
+  const [vaultAuthority] = await getVaultAuth(program.programId, admin);
+  const flipCounter = parseInt((await program.account.coreState.fetch(coreState)).flipCounter);
+  const [betState, betStateNonce] = await getBetState(program.programId, admin, user.publicKey, flipCounter);
   
-  let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+  const userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ?
     user.publicKey : (await getAssociatedTokenAddress(tokenMint, user.publicKey));
   let vaultTokenAccount;
-  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
-  else {
-    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin);
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) {
+    vaultTokenAccount = vaultAuthority;
+  } else {
+    let [_vaultTokenAccount] = await getVaultTokenAccount(program.programId, tokenMint, admin);
     vaultTokenAccount = _vaultTokenAccount;
   }
-  let [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin);
+  const [allowed, allowedNonce] = await getAllowed(program.programId, tokenMint, admin);
 
   await program.rpc.bet({
     amount: new anchor.BN(amount),
@@ -196,17 +198,17 @@ export async function bet(admin: PublicKey, user: Keypair, tokenMint: PublicKey,
 }
 
 export async function betReturn(admin: Keypair, executer: Keypair, betState: PublicKey) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
-  let { betStateNonce, user, flipCounter, tokenMint } = (await program.account.betState.fetch(betState));
-
-  let [vaultAuthority, vaultAuthNonce] = await getVaultAuth(program.programId, admin.publicKey);
+  const [coreState] = await getCoreState(program.programId, admin.publicKey);
+  const {user, tokenMint } = (await program.account.betState.fetch(betState));
+  const [vaultAuthority] = await getVaultAuth(program.programId, admin.publicKey);
   
-  let userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ? 
+  const userTokenAccount = (tokenMint.toBase58() === NATIVE_MINT.toBase58()) ?
     user : (await getAssociatedTokenAddress(tokenMint, user));
   let vaultTokenAccount;
-  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) vaultTokenAccount = vaultAuthority;
-  else {
-    let [_vaultTokenAccount, _vaultTokenAccountNonce] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
+  if (tokenMint.toBase58() === NATIVE_MINT.toBase58()) {
+    vaultTokenAccount = vaultAuthority;
+  } else {
+    let [_vaultTokenAccount] = await getVaultTokenAccount(program.programId, tokenMint, admin.publicKey);
     vaultTokenAccount = _vaultTokenAccount;
   }
 
@@ -231,7 +233,7 @@ export async function betReturn(admin: Keypair, executer: Keypair, betState: Pub
 }
 
 export async function updateCoreState(admin: Keypair, feePercent: number, active: boolean, allowDirectBet: boolean) {
-  let [coreState, coreStateNonce] = await getCoreState(program.programId, admin.publicKey);
+  const [coreState] = await getCoreState(program.programId, admin.publicKey);
 
   await program.rpc.updateCoreState({
     feePercent: new anchor.BN(feePercent * 100),
